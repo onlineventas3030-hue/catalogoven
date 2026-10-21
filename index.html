@@ -1,0 +1,885 @@
+<!doctype html>
+<html lang="es" class="h-full bg-stone-50 text-stone-900 antialiased">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Katalog Minimal - Catálogo Minimalista con Tasa BCV & Panel Admin</title>
+    <!-- Tailwind CSS y Fuentes -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <!-- React 18 & Babel para ejecución directa sin build en Vercel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      body { font-family: 'Plus Jakarta Sans', sans-serif; }
+      .font-display { font-family: 'Space Grotesk', sans-serif; }
+      .font-mono-num { font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
+    </style>
+  </head>
+  <body class="h-full bg-stone-50 text-stone-900 font-sans selection:bg-stone-900 selection:text-white">
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect, useMemo } = React;
+
+      const DEFAULT_PRODUCTS = [
+        {
+          id: 'prod-001',
+          code: 'AUD-9010',
+          name: 'Auriculares Supraaurales Studio One',
+          description: 'Almohadillas de cuero suave y estructura de aluminio anodizado mate. Cancelación de ruido activa híbrida y transductores de 40mm. Batería de 38 horas continuas.',
+          price_usd: 185.0,
+          stock: 14,
+          status: 'disponible',
+          category: 'Tecnología & Audio',
+          images: [
+            'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80',
+            'https://images.unsplash.com/photo-1484704849700-f032a568e944?auto=format&fit=crop&w=800&q=80'
+          ]
+        },
+        {
+          id: 'prod-002',
+          code: 'SPK-3340',
+          name: 'Altavoz Portátil en Cilindro de Hormigón & Lana',
+          description: 'Caja acústica monocromática con base de hormigón ligero y rejilla de lana nórdica. Conexión True Wireless Stereo y carga USB-C rápida.',
+          price_usd: 120.0,
+          stock: 6,
+          status: 'disponible',
+          category: 'Tecnología & Audio',
+          images: [
+            'https://images.unsplash.com/photo-1545454675-3531b543be5d?auto=format&fit=crop&w=800&q=80'
+          ]
+        },
+        {
+          id: 'prod-003',
+          code: 'ACC-1102',
+          name: 'Tarjetero Minimal en Cuero Vachetta Natural',
+          description: 'Confeccionado a mano con curtido vegetal italiano sin tratamientos químicos. Capacidad para 6 tarjetas y compartimento central.',
+          price_usd: 48.0,
+          stock: 2,
+          status: 'bajo_stock',
+          category: 'Moda & Accesorios',
+          images: [
+            'https://images.unsplash.com/photo-1627123424574-724758594e93?auto=format&fit=crop&w=800&q=80'
+          ]
+        },
+        {
+          id: 'prod-004',
+          code: 'LMP-4028',
+          name: 'Lámpara de Sobremesa Aura en Travertino',
+          description: 'Pieza de iluminación arquitectónica en bloque de travertino con difusor de vidrio opal soplado artesanalmente.',
+          price_usd: 215.0,
+          stock: 5,
+          status: 'disponible',
+          category: 'Hogar & Espacio',
+          images: [
+            'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=800&q=80'
+          ]
+        },
+        {
+          id: 'prod-005',
+          code: 'COF-7015',
+          name: 'Cafetera de Goteo en Vidrio Borosilicato',
+          description: 'Set pour-over de borosilicato resistente a choques térmicos con collarín de nogal negro y cordón de cuero crudo.',
+          price_usd: 62.0,
+          stock: 8,
+          status: 'disponible',
+          category: 'Cafetería & Rituales',
+          images: [
+            'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=800&q=80'
+          ]
+        },
+        {
+          id: 'prod-006',
+          code: 'OPT-5104',
+          name: 'Gafas de Sol Silueta Octogonal en Titanio',
+          description: 'Montura ultraligera moldeada en titanio japonés ionizado mate. Cristales minerales UV400 y peso de 16 gramos.',
+          price_usd: 155.0,
+          stock: 4,
+          status: 'disponible',
+          category: 'Moda & Accesorios',
+          images: [
+            'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80'
+          ]
+        }
+      ];
+
+      function formatBs(amount) {
+        return 'Bs. ' + Number(amount).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+
+      function formatUsd(amount) {
+        return '$' + Number(amount).toFixed(2);
+      }
+
+      function App() {
+        const [bcvRate, setBcvRate] = useState(() => {
+          const saved = localStorage.getItem('katalog_bcv_rate');
+          return saved ? parseFloat(saved) : 68.45;
+        });
+        const [bcvDate, setBcvDate] = useState(new Date().toLocaleDateString('es-VE'));
+        const [isLoadingRate, setIsLoadingRate] = useState(false);
+
+        const [products, setProducts] = useState(() => {
+          const saved = localStorage.getItem('katalog_live_products');
+          return saved ? JSON.parse(saved) : DEFAULT_PRODUCTS;
+        });
+
+        const [search, setSearch] = useState('');
+        const [selectedCategory, setSelectedCategory] = useState('');
+        const [selectedProduct, setSelectedProduct] = useState(null);
+
+        // Estados del Administrador
+        const [isAdmin, setIsAdmin] = useState(() => {
+          return localStorage.getItem('katalog_admin_logged') === 'true';
+        });
+        const [isLoginOpen, setIsLoginOpen] = useState(false);
+        const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+        const [adminTab, setAdminTab] = useState('products');
+        const [isProductFormOpen, setIsProductFormOpen] = useState(false);
+        const [editingProduct, setEditingProduct] = useState(null);
+
+        // Formulario
+        const [formCode, setFormCode] = useState('');
+        const [formName, setFormName] = useState('');
+        const [formCategory, setFormCategory] = useState('Tecnología & Audio');
+        const [formPriceUsd, setFormPriceUsd] = useState(50);
+        const [formStock, setFormStock] = useState(10);
+        const [formDesc, setFormDesc] = useState('');
+        const [formImages, setFormImages] = useState(['']);
+
+        // Persistencia en LocalStorage
+        useEffect(() => {
+          localStorage.setItem('katalog_live_products', JSON.stringify(products));
+        }, [products]);
+
+        useEffect(() => {
+          localStorage.setItem('katalog_bcv_rate', bcvRate.toString());
+        }, [bcvRate]);
+
+        // Carga tasa oficial BCV
+        useEffect(() => {
+          fetchBcvRate();
+        }, []);
+
+        const fetchBcvRate = () => {
+          setIsLoadingRate(true);
+          fetch('https://ve.dolarapi.com/v1/dolares/oficial')
+            .then(res => res.json())
+            .then(data => {
+              const val = parseFloat(data.promedio || data.precio);
+              if (val) {
+                setBcvRate(val);
+                if (data.fechaActualizacion) {
+                  setBcvDate(new Date(data.fechaActualizacion).toLocaleDateString('es-VE'));
+                }
+              }
+            })
+            .catch(() => console.log('Tasa offline'))
+            .finally(() => setIsLoadingRate(false));
+        };
+
+        const categories = useMemo(() => {
+          const set = new Set(products.map(p => p.category));
+          set.add('Tecnología & Audio');
+          set.add('Moda & Accesorios');
+          set.add('Hogar & Espacio');
+          set.add('Cafetería & Rituales');
+          return Array.from(set);
+        }, [products]);
+
+        const filtered = useMemo(() => {
+          return products.filter(p => {
+            const matchesSearch = !search || 
+              p.name.toLowerCase().includes(search.toLowerCase()) || 
+              p.code.toLowerCase().includes(search.toLowerCase()) ||
+              p.description.toLowerCase().includes(search.toLowerCase());
+            const matchesCat = !selectedCategory || p.category === selectedCategory;
+            return matchesSearch && matchesCat;
+          });
+        }, [products, search, selectedCategory]);
+
+        const handleStockChange = (productId, delta) => {
+          setProducts(prev => prev.map(p => {
+            if (p.id === productId) {
+              const newStock = Math.max(0, p.stock + delta);
+              return {
+                ...p,
+                stock: newStock,
+                status: newStock === 0 ? 'agotado' : newStock <= 3 ? 'bajo_stock' : 'disponible'
+              };
+            }
+            return p;
+          }));
+        };
+
+        const handleDeleteProduct = (productId) => {
+          if (confirm('¿Eliminar este producto del catálogo?')) {
+            setProducts(prev => prev.filter(p => p.id !== productId));
+          }
+        };
+
+        const handleOpenNewProduct = () => {
+          setEditingProduct(null);
+          setFormCode('KAT-' + Math.floor(1000 + Math.random() * 9000));
+          setFormName('');
+          setFormCategory(categories[0] || 'Tecnología & Audio');
+          setFormPriceUsd(50);
+          setFormStock(10);
+          setFormDesc('');
+          setFormImages(['https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80']);
+          setIsProductFormOpen(true);
+        };
+
+        const handleOpenEditProduct = (prod) => {
+          setEditingProduct(prod);
+          setFormCode(prod.code);
+          setFormName(prod.name);
+          setFormCategory(prod.category);
+          setFormPriceUsd(prod.price_usd);
+          setFormStock(prod.stock);
+          setFormDesc(prod.description);
+          setFormImages(prod.images || ['']);
+          setIsProductFormOpen(true);
+        };
+
+        const handleSaveProduct = (e) => {
+          e.preventDefault();
+          const cleanImages = formImages.filter(img => img.trim() !== '').slice(0, 4);
+          if (cleanImages.length === 0) {
+            cleanImages.push('https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80');
+          }
+
+          if (editingProduct) {
+            setProducts(prev => prev.map(p => {
+              if (p.id === editingProduct.id) {
+                return {
+                  ...p,
+                  code: formCode,
+                  name: formName,
+                  category: formCategory,
+                  price_usd: parseFloat(formPriceUsd) || 0,
+                  stock: parseInt(formStock) || 0,
+                  description: formDesc,
+                  images: cleanImages,
+                  status: (parseInt(formStock) || 0) === 0 ? 'agotado' : (parseInt(formStock) || 0) <= 3 ? 'bajo_stock' : 'disponible'
+                };
+              }
+              return p;
+            }));
+          } else {
+            const newProd = {
+              id: 'prod-' + Date.now(),
+              code: formCode,
+              name: formName,
+              category: formCategory,
+              subcategories: ['Nuevo'],
+              price_usd: parseFloat(formPriceUsd) || 0,
+              stock: parseInt(formStock) || 0,
+              description: formDesc,
+              images: cleanImages,
+              status: (parseInt(formStock) || 0) === 0 ? 'agotado' : (parseInt(formStock) || 0) <= 3 ? 'bajo_stock' : 'disponible'
+            };
+            setProducts([newProd, ...products]);
+          }
+
+          setIsProductFormOpen(false);
+          setEditingProduct(null);
+        };
+
+        const handleLogin = (e) => {
+          e.preventDefault();
+          setIsAdmin(true);
+          localStorage.setItem('katalog_admin_logged', 'true');
+          setIsLoginOpen(false);
+          setIsAdminPanelOpen(true);
+        };
+
+        const handleLogout = () => {
+          setIsAdmin(false);
+          localStorage.removeItem('katalog_admin_logged');
+          setIsAdminPanelOpen(false);
+        };
+
+        return (
+          <div className="min-h-screen flex flex-col bg-stone-50 pb-20">
+            {/* Header */}
+            <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-stone-200 shadow-xs">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
+                <div>
+                  <h1 className="font-display font-black text-xl sm:text-2xl text-stone-900 tracking-tighter">
+                    KATALOG<span className="text-stone-400">.</span>
+                  </h1>
+                  <span className="text-[10px] tracking-widest uppercase font-medium text-stone-500">
+                    Catálogo Minimalista
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 sm:gap-3">
+                  {/* Tasa BCV Pill */}
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-stone-100 border border-stone-200 text-xs font-medium">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span className="text-stone-500 hidden sm:inline">BCV Oficial:</span>
+                    <span className="font-bold text-stone-900 font-mono-num">Bs. {bcvRate.toFixed(2)}</span>
+                    <span className="text-[10px] text-stone-400 border-l border-stone-300 pl-1.5 hidden md:inline">{bcvDate}</span>
+                  </div>
+
+                  {/* BOTÓN EN EL HEADER */}
+                  {isAdmin ? (
+                    <button
+                      onClick={() => setIsAdminPanelOpen(true)}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold shadow-xs cursor-pointer"
+                    >
+                      <span>⚙️</span>
+                      <span className="hidden sm:inline">Panel Admin</span>
+                      <span className="sm:hidden">Admin</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setIsLoginOpen(true)}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-xs font-semibold shadow-xs cursor-pointer"
+                    >
+                      <span>🔒</span>
+                      <span>Acceso Admin</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </header>
+
+            {/* Hero */}
+            <section className="bg-gradient-to-b from-stone-100/70 to-stone-50 border-b border-stone-200/70 py-10">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6">
+                <span className="inline-block px-3 py-1 rounded-full bg-stone-200/80 text-stone-700 text-xs font-semibold mb-3">
+                  • Inventario en Tiempo Real • Cotización BCV
+                </span>
+                <h2 className="text-3xl sm:text-4xl font-extrabold text-stone-900 tracking-tight max-w-2xl">
+                  Catálogo minimalista con precios convertidos al instante en Bolívares y Dólares.
+                </h2>
+              </div>
+            </section>
+
+            {/* Main Content */}
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex-1 w-full">
+              {/* Buscador & Categorías */}
+              <div className="mb-8 space-y-4">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Buscar por nombre, código (SKU) o características..."
+                    className="flex-1 px-4 py-3 bg-white border border-stone-200 rounded-xl text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-stone-900"
+                  />
+                  {isAdmin && (
+                    <button
+                      onClick={handleOpenNewProduct}
+                      className="px-5 py-3 bg-stone-900 hover:bg-stone-800 text-white font-semibold text-xs rounded-xl shadow-xs flex items-center justify-center gap-2"
+                    >
+                      + Agregar Producto
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                  <button
+                    onClick={() => setSelectedCategory('')}
+                    className={`px-4 py-2 rounded-xl text-xs font-medium transition-all ${
+                      selectedCategory === '' ? 'bg-stone-900 text-white' : 'bg-white text-stone-700 border border-stone-200'
+                    }`}
+                  >
+                    Todos ({products.length})
+                  </button>
+                  {categories.map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${
+                        selectedCategory === cat ? 'bg-stone-900 text-white' : 'bg-white text-stone-700 border border-stone-200'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filtered.map(product => {
+                  const calculatedBs = product.price_usd * bcvRate;
+                  return (
+                    <div
+                      key={product.id}
+                      onClick={() => setSelectedProduct(product)}
+                      className="group bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-xs hover:shadow-lg transition-all cursor-pointer flex flex-col justify-between"
+                    >
+                      <div className="relative aspect-square overflow-hidden bg-stone-100">
+                        <img
+                          src={product.images[0]}
+                          alt={product.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                        <div className="absolute top-3 left-3 bg-stone-900/80 backdrop-blur-md text-white text-[11px] font-mono px-2 py-1 rounded-md font-bold">
+                          CÓD: {product.code}
+                        </div>
+                        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md text-stone-800 text-[11px] px-2 py-1 rounded-md font-medium">
+                          {product.category}
+                        </div>
+                        <div className="absolute bottom-3 left-3 bg-stone-900/80 backdrop-blur-md text-white text-[11px] px-2 py-1 rounded-md flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                          <span>{product.stock} disponibles</span>
+                        </div>
+                      </div>
+
+                      <div className="p-4 flex-1 flex flex-col justify-between">
+                        <div>
+                          <h3 className="font-bold text-stone-900 line-clamp-1">{product.name}</h3>
+                          <p className="text-xs text-stone-500 mt-1 line-clamp-2">{product.description}</p>
+                        </div>
+                        <div className="mt-4 pt-3 border-t border-stone-100 flex items-baseline justify-between">
+                          <div>
+                            <span className="text-[10px] text-stone-400 uppercase font-semibold block">USD</span>
+                            <span className="text-lg font-bold text-stone-900 font-mono-num">{formatUsd(product.price_usd)}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[10px] text-stone-400 font-semibold block">TASA BCV</span>
+                            <span className="text-sm font-bold text-stone-700 font-mono-num">{formatBs(calculatedBs)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </main>
+
+            {/* BOTÓN FLOTANTE EN ESQUINA INFERIOR DERECHA */}
+            <div className="fixed bottom-5 right-5 z-40">
+              <button
+                onClick={() => {
+                  if (isAdmin) {
+                    setIsAdminPanelOpen(true);
+                  } else {
+                    setIsLoginOpen(true);
+                  }
+                }}
+                className="px-4 py-3 bg-stone-900 hover:bg-stone-800 text-white rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold border border-white/20 transition-all transform hover:scale-105 cursor-pointer"
+              >
+                <span>{isAdmin ? '⚙️' : '🔒'}</span>
+                <span>{isAdmin ? 'Gestionar Inventario' : 'Acceso Administrador'}</span>
+              </button>
+            </div>
+
+            {/* Modal Producto */}
+            {selectedProduct && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs">
+                <div className="bg-white rounded-3xl max-w-2xl w-full border border-stone-200 shadow-2xl overflow-hidden relative max-h-[90vh] flex flex-col md:flex-row">
+                  <button
+                    onClick={() => setSelectedProduct(null)}
+                    className="absolute top-4 right-4 z-20 p-2 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 transition-colors"
+                  >
+                    ✕
+                  </button>
+
+                  <div className="w-full md:w-1/2 bg-stone-100 relative aspect-square md:aspect-auto">
+                    <img
+                      src={selectedProduct.images[0]}
+                      alt={selectedProduct.name}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-3 left-3 bg-stone-900/80 backdrop-blur-md text-white text-xs font-mono px-2 py-1 rounded">
+                      CÓD: {selectedProduct.code}
+                    </div>
+                  </div>
+
+                  <div className="w-full md:w-1/2 p-6 flex flex-col justify-between overflow-y-auto">
+                    <div>
+                      <span className="text-xs font-semibold text-stone-400 uppercase tracking-wider block mb-1">
+                        {selectedProduct.category}
+                      </span>
+                      <h3 className="text-xl font-bold text-stone-900">{selectedProduct.name}</h3>
+
+                      <div className="mt-3 p-3 bg-stone-50 border border-stone-200 rounded-xl">
+                        <div className="text-2xl font-bold text-stone-900 font-mono-num">
+                          {formatUsd(selectedProduct.price_usd)}
+                        </div>
+                        <div className="text-sm font-semibold text-stone-700 font-mono-num mt-0.5">
+                          {formatBs(selectedProduct.price_usd * bcvRate)}
+                        </div>
+                        <span className="text-[10px] text-stone-500 block mt-1">
+                          Tasa oficial BCV: Bs. {bcvRate.toFixed(2)} ({bcvDate})
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-stone-600 mt-4 leading-relaxed">
+                        {selectedProduct.description}
+                      </p>
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t border-stone-100">
+                      <a
+                        href={`https://wa.me/?text=${encodeURIComponent(`Hola! Me interesa el producto ${selectedProduct.name} (Código: ${selectedProduct.code}) por valor de ${formatUsd(selectedProduct.price_usd)} (${formatBs(selectedProduct.price_usd * bcvRate)}). ¿Tienen disponibilidad?`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors"
+                      >
+                        Consultar por WhatsApp
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL LOGIN */}
+            {isLoginOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs">
+                <div className="bg-white rounded-3xl max-w-sm w-full border border-stone-200 shadow-2xl p-6 relative">
+                  <button
+                    onClick={() => setIsLoginOpen(false)}
+                    className="absolute top-4 right-4 p-2 rounded-full hover:bg-stone-100 text-stone-400"
+                  >
+                    ✕
+                  </button>
+
+                  <div className="text-center mb-6">
+                    <div className="w-12 h-12 bg-stone-900 text-white rounded-2xl flex items-center justify-center mx-auto mb-3 text-xl">
+                      🔒
+                    </div>
+                    <h3 className="text-lg font-bold text-stone-900">Iniciar Sesión Administrador</h3>
+                    <p className="text-xs text-stone-500 mt-1">Acceso a inventario, precios y fotos</p>
+                  </div>
+
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">Contraseña</label>
+                      <input
+                        type="password"
+                        defaultValue="admin123"
+                        required
+                        placeholder="••••••••"
+                        className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-stone-900"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-3 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                    >
+                      Ingresar al Panel
+                    </button>
+                  </form>
+
+                  <div className="mt-4 pt-3 border-t border-stone-100">
+                    <button
+                      onClick={() => {
+                        setIsAdmin(true);
+                        localStorage.setItem('katalog_admin_logged', 'true');
+                        setIsLoginOpen(false);
+                        setIsAdminPanelOpen(true);
+                      }}
+                      className="w-full py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-semibold cursor-pointer"
+                    >
+                      ⚡ Acceso Rápido Demo (1 Clic)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PANEL DE ADMINISTRACIÓN MODAL */}
+            {isAdminPanelOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-stone-900/70 backdrop-blur-xs overflow-y-auto">
+                <div className="bg-white rounded-3xl max-w-4xl w-full border border-stone-200 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+                  <div className="px-6 py-4 border-b border-stone-200 flex items-center justify-between bg-stone-50">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">⚙️</span>
+                      <div>
+                        <h3 className="text-base font-bold text-stone-900">Panel de Administración</h3>
+                        <p className="text-xs text-stone-500">Gestión de productos y tasa en tiempo real</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleLogout}
+                        className="px-3 py-1.5 rounded-lg text-xs text-stone-500 hover:text-stone-900 hover:bg-stone-200"
+                      >
+                        Cerrar Sesión
+                      </button>
+                      <button
+                        onClick={() => setIsAdminPanelOpen(false)}
+                        className="p-2 rounded-full hover:bg-stone-200 text-stone-500"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex border-b border-stone-200 px-6 gap-4 bg-stone-50/50">
+                    <button
+                      onClick={() => setAdminTab('products')}
+                      className={`py-3 text-xs font-bold border-b-2 ${adminTab === 'products' ? 'border-stone-900 text-stone-900' : 'border-transparent text-stone-500'}`}
+                    >
+                      Inventario & Productos ({products.length})
+                    </button>
+                    <button
+                      onClick={() => setAdminTab('bcv')}
+                      className={`py-3 text-xs font-bold border-b-2 ${adminTab === 'bcv' ? 'border-stone-900 text-stone-900' : 'border-transparent text-stone-500'}`}
+                    >
+                      Ajuste Tasa BCV
+                    </button>
+                  </div>
+
+                  {adminTab === 'products' && (
+                    <div className="p-6 overflow-y-auto flex-1 space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-semibold text-stone-600">
+                          Total artículos: {products.length}
+                        </span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleOpenNewProduct}
+                            className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold rounded-xl"
+                          >
+                            + Nuevo Producto
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="border border-stone-200 rounded-2xl overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-stone-50 border-b border-stone-200 text-stone-600 font-semibold uppercase text-[10px]">
+                            <tr>
+                              <th className="py-2.5 px-3">Código</th>
+                              <th className="py-2.5 px-3">Nombre</th>
+                              <th className="py-2.5 px-3 text-center">Stock (+ / -)</th>
+                              <th className="py-2.5 px-3 text-right">Precio USD / Bs.</th>
+                              <th className="py-2.5 px-3 text-center">Acciones</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-stone-100">
+                            {products.map(p => (
+                              <tr key={p.id} className="hover:bg-stone-50">
+                                <td className="py-2.5 px-3 font-mono font-bold text-stone-900">{p.code}</td>
+                                <td className="py-2.5 px-3 max-w-[200px] truncate">{p.name}</td>
+                                <td className="py-2.5 px-3">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <button
+                                      onClick={() => handleStockChange(p.id, -1)}
+                                      className="w-6 h-6 rounded bg-stone-100 hover:bg-stone-200 font-bold"
+                                    >
+                                      -
+                                    </button>
+                                    <span className="w-8 text-center font-bold font-mono-num">{p.stock}</span>
+                                    <button
+                                      onClick={() => handleStockChange(p.id, 1)}
+                                      className="w-6 h-6 rounded bg-stone-100 hover:bg-stone-200 font-bold"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-mono-num">
+                                  <div className="font-bold text-stone-900">{formatUsd(p.price_usd)}</div>
+                                  <div className="text-[10px] text-stone-500">{formatBs(p.price_usd * bcvRate)}</div>
+                                </td>
+                                <td className="py-2.5 px-3 text-center">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <button
+                                      onClick={() => handleOpenEditProduct(p)}
+                                      className="text-stone-600 hover:text-stone-900 text-xs font-medium underline"
+                                    >
+                                      Editar
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteProduct(p.id)}
+                                      className="text-rose-600 hover:text-rose-800 text-xs font-medium"
+                                    >
+                                      Eliminar
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {adminTab === 'bcv' && (
+                    <div className="p-6 overflow-y-auto flex-1 space-y-4">
+                      <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200">
+                        <span className="text-xs font-semibold text-stone-500 uppercase">Tasa Activa Actual</span>
+                        <div className="text-3xl font-extrabold text-stone-900 font-mono-num mt-1">
+                          Bs. {bcvRate.toFixed(2)}
+                        </div>
+                        <p className="text-xs text-stone-500 mt-1">
+                          Al cambiar esta tasa, se actualiza automáticamente el valor de todos los productos en el catálogo.
+                        </p>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={bcvRate}
+                          onChange={(e) => setBcvRate(parseFloat(e.target.value) || 0)}
+                          className="px-3 py-2 border border-stone-200 rounded-xl text-sm font-bold font-mono"
+                        />
+                        <button
+                          onClick={fetchBcvRate}
+                          disabled={isLoadingRate}
+                          className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-semibold"
+                        >
+                          {isLoadingRate ? 'Consultando...' : 'Sincronizar con API BCV Oficial'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* FORMULARIO AGREGAR / EDITAR */}
+            {isProductFormOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs">
+                <div className="bg-white rounded-3xl max-w-lg w-full border border-stone-200 shadow-2xl p-6 relative max-h-[90vh] overflow-y-auto">
+                  <button
+                    onClick={() => setIsProductFormOpen(false)}
+                    className="absolute top-4 right-4 p-2 rounded-full hover:bg-stone-100 text-stone-400"
+                  >
+                    ✕
+                  </button>
+
+                  <h3 className="text-lg font-bold text-stone-900 mb-4">
+                    {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
+                  </h3>
+
+                  <form onSubmit={handleSaveProduct} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">Código (SKU)</label>
+                        <input
+                          type="text"
+                          required
+                          value={formCode}
+                          onChange={(e) => setFormCode(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm font-mono font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">Stock</label>
+                        <input
+                          type="number"
+                          min="0"
+                          required
+                          value={formStock}
+                          onChange={(e) => setFormStock(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">Nombre</label>
+                      <input
+                        type="text"
+                        required
+                        value={formName}
+                        onChange={(e) => setFormName(e.target.value)}
+                        placeholder="Nombre del artículo"
+                        className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">Categoría</label>
+                        <select
+                          value={formCategory}
+                          onChange={(e) => setFormCategory(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs"
+                        >
+                          {categories.map(c => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">Precio USD ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          required
+                          value={formPriceUsd}
+                          onChange={(e) => setFormPriceUsd(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm font-bold font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 text-xs flex justify-between items-center">
+                      <span className="text-stone-500">Equivalente en Bs (Tasa {bcvRate.toFixed(2)}):</span>
+                      <span className="font-bold text-stone-900 font-mono-num">
+                        {formatBs((parseFloat(formPriceUsd) || 0) * bcvRate)}
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">Foto Principal (URL)</label>
+                      <input
+                        type="url"
+                        value={formImages[0] || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormImages([val, ...formImages.slice(1)]);
+                        }}
+                        placeholder="https://images.unsplash.com/..."
+                        className="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">Descripción</label>
+                      <textarea
+                        rows="2"
+                        value={formDesc}
+                        onChange={(e) => setFormDesc(e.target.value)}
+                        placeholder="Materiales, dimensiones, detalles..."
+                        className="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs"
+                      />
+                    </div>
+
+                    <div className="pt-2 flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsProductFormOpen(false)}
+                        className="px-4 py-2 bg-stone-100 hover:bg-stone-200 rounded-xl text-xs font-semibold cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-5 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-bold cursor-pointer"
+                      >
+                        Guardar Producto
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+  </body>
+</html>
