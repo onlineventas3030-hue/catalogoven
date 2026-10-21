@@ -1,898 +1,936 @@
-﻿<!doctype html>
-<html lang="es" class="h-full bg-stone-50 text-stone-900 antialiased">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Katalogo's VEN</title>
-    <!-- Tailwind CSS y Fuentes -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700;900&display=swap" rel="stylesheet">
-    <!-- React 18 & Babel -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo Express | Pedidos en Tiempo Real</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-      body { font-family: 'Plus Jakarta Sans', sans-serif; }
-      .font-display { font-family: 'Space Grotesk', sans-serif; }
-      .font-mono-num { font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
-    </style>
-  </head>
-  <body class="h-full bg-stone-50 text-stone-900 font-sans selection:bg-stone-900 selection:text-white">
-    <div id="root"></div>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans antialiased min-h-screen flex flex-col justify-between">
 
-    <script type="text/babel">
-      const { useState, useEffect, useMemo } = React;
-
-      // 🔑 CONFIGURA TUS CREDENCIALES DE SUPABASE AQUÍ
-      const SUPABASE_URL = 'https://navjwbdakrfbnsijuyck.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hdmp3YmRha3JmYm5zaWp1eWNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1NTA2MDIsImV4cCI6MjEwODEyNjYwMn0.BmlUvysEUHmvDL7LuWnw9u1HOGaphxL1cGm1uMX0FU4';
-      const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-      const DEFAULT_COMPANY = {
-        name: 'Katalog Minimal C.A.',
-        address: 'Av. Francisco de Miranda, Edif. Centro Cristal, Piso 4, Caracas, Venezuela',
-        whatsapp: '+58 412 1234567',
-        rif: 'J-50123456-7'
-      };
-
-      function formatBs(amount) {
-        return 'Bs. ' + Number(amount).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      }
-
-      function formatUsd(amount) {
-        return '$' + Number(amount).toFixed(2);
-      }
-
-      function App() {
-        const [bcvRate, setBcvRate] = useState(68.45);
-        const [bcvDate, setBcvDate] = useState(new Date().toLocaleDateString('es-VE'));
-        const [isLoadingRate, setIsLoadingRate] = useState(false);
-
-        const [products, setProducts] = useState([]);
-        const [companyInfo, setCompanyInfo] = useState(DEFAULT_COMPANY);
-
-        const [search, setSearch] = useState('');
-        const [selectedCategory, setSelectedCategory] = useState('');
-        const [selectedProduct, setSelectedProduct] = useState(null);
-        const [modalPhotoIndex, setModalPhotoIndex] = useState(0);
-        const [shareFeedbackId, setShareFeedbackId] = useState(null);
-        const [modalCopied, setModalCopied] = useState(false);
-
-        // Cargar productos desde Supabase al iniciar
-        useEffect(() => {
-          async function fetchProductsFromCloud() {
-            try {
-              const { data, error } = await supabase.from('products').select('*');
-              if (data && data.length > 0) {
-                setProducts(data);
-              }
-            } catch (err) {
-              console.error('Error cargando desde Supabase:', err);
-            }
-          }
-          fetchProductsFromCloud();
-          fetchBcvRate();
-        }, []);
-
-        const fetchBcvRate = () => {
-          setIsLoadingRate(true);
-          fetch('https://ve.dolarapi.com/v1/dolares/oficial')
-            .then(res => res.json())
-            .then(data => {
-              const val = parseFloat(data.promedio || data.precio);
-              if (val) {
-                setBcvRate(val);
-                if (data.fechaActualizacion) {
-                  setBcvDate(new Date(data.fechaActualizacion).toLocaleDateString('es-VE'));
-                }
-              }
-            })
-            .catch(() => console.log('Tasa offline'))
-            .finally(() => setIsLoadingRate(false));
-        };
-
-        const getProductShareLink = (prod) => {
-          const base = window.location.origin + window.location.pathname;
-          return `${base}?p=${encodeURIComponent(prod.code)}`;
-        };
-
-        const handleCopyProductLink = (prod) => {
-          const link = getProductShareLink(prod);
-          navigator.clipboard.writeText(link);
-          setShareFeedbackId(prod.id);
-          setModalCopied(true);
-          setTimeout(() => {
-            setShareFeedbackId(null);
-            setModalCopied(false);
-          }, 2500);
-        };
-
-        const getWhatsappShareUrl = (prod) => {
-          const isOutOfStock = prod.stock === 0 || prod.status === 'agotado';
-          const calcBs = prod.price_usd * bcvRate;
-          const link = getProductShareLink(prod);
-          const msg = `📦 *${prod.name}*\n🏷️ Código: *${prod.code}*\n📁 Categoría: ${prod.category}\n💵 Precio: *$${prod.price_usd.toFixed(2)} USD* / *${formatBs(calcBs)}*\n📊 Disponibilidad: ${isOutOfStock ? '❌ Agotado (0 disponibles)' : `✅ ${prod.stock} disponibles`}\n\n📝 Descripción: ${prod.description}\n\n🔗 Ver en el catálogo web: ${link}`;
-          return `https://wa.me/?text=${encodeURIComponent(msg)}`;
-        };
-
-        const handleShareWhatsappDirect = (prod) => {
-          window.open(getWhatsappShareUrl(prod), '_blank');
-        };
-
-        useEffect(() => {
-          try {
-            const params = new URLSearchParams(window.location.search);
-            const pCode = params.get('p') || params.get('prod');
-            if (pCode && products.length > 0) {
-              const found = products.find(p => p.code.toLowerCase() === pCode.toLowerCase());
-              if (found) {
-                setSelectedProduct(found);
-                setModalPhotoIndex(0);
-              }
-            }
-          } catch (e) {}
-        }, [products]);
-
-        // Estados de Administración
-        const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('katalog_admin_logged') === 'true');
-        const [isDemoUser, setIsDemoUser] = useState(() => localStorage.getItem('katalog_is_demo') === 'true');
-
-        const [isLoginOpen, setIsLoginOpen] = useState(false);
-        const [loginView, setLoginView] = useState('login');
-        const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
-        const [adminTab, setAdminTab] = useState('products');
-        const [demoAlert, setDemoAlert] = useState('');
-
-        const [recoveryEmail, setRecoveryEmail] = useState('admin@katalog.com');
-        const [generatedCode, setGeneratedCode] = useState('');
-        const [inputCode, setInputCode] = useState('');
-        const [recoveryNewPass, setRecoveryNewPass] = useState('');
-        const [recoveryStatus, setRecoveryStatus] = useState('');
-
-        const [currentPass, setCurrentPass] = useState('');
-        const [newPass, setNewPass] = useState('');
-        const [confirmPass, setConfirmPass] = useState('');
-        const [passwordMsg, setPasswordMsg] = useState('');
-
-        const [compNameInput, setCompNameInput] = useState(companyInfo.name);
-        const [compAddrInput, setCompAddrInput] = useState(companyInfo.address);
-        const [compWpInput, setCompWpInput] = useState(companyInfo.whatsapp);
-        const [compRifInput, setCompRifInput] = useState(companyInfo.rif);
-        const [compMsg, setCompMsg] = useState('');
-
-        const [isProductFormOpen, setIsProductFormOpen] = useState(false);
-        const [editingProduct, setEditingProduct] = useState(null);
-        const [formCode, setFormCode] = useState('');
-        const [formName, setFormName] = useState('');
-        const [formCategory, setFormCategory] = useState('Tecnología & Audio');
-        const [formPriceUsd, setFormPriceUsd] = useState(50);
-        const [formStock, setFormStock] = useState(10);
-        const [formDesc, setFormDesc] = useState('');
-        const [formImages, setFormImages] = useState(['']);
-
-        const showDemoAlert = () => {
-          setDemoAlert('Modo Demostración: Estás explorando el panel en modo solo lectura.');
-          setTimeout(() => setDemoAlert(''), 5000);
-        };
-
-        const categories = useMemo(() => {
-          const set = new Set(products.map(p => p.category));
-          set.add('Tecnología & Audio');
-          set.add('Moda & Accesorios');
-          set.add('Hogar & Espacio');
-          set.add('Cafetería & Rituales');
-          return Array.from(set);
-        }, [products]);
-
-        const filtered = useMemo(() => {
-          return products.filter(p => {
-            const matchesSearch = !search || 
-              p.name.toLowerCase().includes(search.toLowerCase()) || 
-              p.code.toLowerCase().includes(search.toLowerCase()) ||
-              p.description.toLowerCase().includes(search.toLowerCase());
-            const matchesCat = !selectedCategory || p.category === selectedCategory;
-            return matchesSearch && matchesCat;
-          });
-        }, [products, search, selectedCategory]);
-
-        // Sincronizar cambios de Stock con Supabase
-        const handleStockChange = async (productId, delta) => {
-          if (isDemoUser) {
-            showDemoAlert();
-            return;
-          }
-          const productToUpdate = products.find(p => p.id === productId);
-          if (!productToUpdate) return;
-
-          const newStock = Math.max(0, productToUpdate.stock + delta);
-          const newStatus = newStock === 0 ? 'Agotado' : newStock <= 3 ? 'bajo_stock' : 'Disponible';
-
-          const { error } = await supabase
-            .from('products')
-            .update({ stock: newStock, status: newStatus })
-            .eq('id', productId);
-
-          if (!error) {
-            setProducts(prev => prev.map(p => {
-              if (p.id === productId) {
-                return { ...p, stock: newStock, status: newStatus };
-              }
-              return p;
-            }));
-          } else {
-            alert('Error al actualizar stock en la base de datos');
-          }
-        };
-
-        // Eliminar producto en Supabase
-        const handleDeleteProduct = async (productId) => {
-          if (isDemoUser) {
-            showDemoAlert();
-            return;
-          }
-          if (confirm('¿Eliminar este producto del catálogo?')) {
-            const { error } = await supabase.from('products').delete().eq('id', productId);
-            if (!error) {
-              setProducts(prev => prev.filter(p => p.id !== productId));
-            } else {
-              alert('Error al eliminar el producto');
-            }
-          }
-        };
-
-        const handleOpenNewProduct = () => {
-          if (isDemoUser) {
-            showDemoAlert();
-            return;
-          }
-          setEditingProduct(null);
-          setFormCode('KAT-' + Math.floor(1000 + Math.random() * 9000));
-          setFormName('');
-          setFormCategory(categories[0] || 'Tecnología & Audio');
-          setFormPriceUsd(50);
-          setFormStock(10);
-          setFormDesc('');
-          setFormImages(['https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80']);
-          setIsProductFormOpen(true);
-        };
-
-        const handleOpenEditProduct = (prod) => {
-          if (isDemoUser) {
-            showDemoAlert();
-            return;
-          }
-          setEditingProduct(prod);
-          setFormCode(prod.code);
-          setFormName(prod.name);
-          setFormCategory(prod.category);
-          setFormPriceUsd(prod.price_usd);
-          setFormStock(prod.stock);
-          setFormDesc(prod.description);
-          setFormImages(prod.images || ['']);
-          setIsProductFormOpen(true);
-        };
-
-        // Guardar o Crear Producto en Supabase
-        const handleSaveProduct = async (e) => {
-          e.preventDefault();
-          if (isDemoUser) {
-            showDemoAlert();
-            return;
-          }
-
-          const cleanImages = formImages.filter(img => img && img.trim() !== '').slice(0, 4);
-          if (cleanImages.length === 0) {
-            cleanImages.push('https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80');
-          }
-
-          const productData = {
-            code: formCode,
-            name: formName,
-            category: formCategory,
-            price_usd: parseFloat(formPriceUsd) || 0,
-            stock: parseInt(formStock) || 0,
-            description: formDesc,
-            images: cleanImages,
-            status: (parseInt(formStock) || 0) === 0 ? 'Agotado' : (parseInt(formStock) || 0) <= 3 ? 'bajo_stock' : 'Disponible'
-          };
-
-          if (editingProduct) {
-            const { error } = await supabase
-              .from('products')
-              .update(productData)
-              .eq('id', editingProduct.id);
-
-            if (!error) {
-              setProducts(prev => prev.map(p => p.id === editingProduct.id ? { ...p, ...productData } : p));
-            } else {
-              alert('Error al actualizar el producto');
-              return;
-            }
-          } else {
-            productData.id = 'prod-' + Date.now();
-            const { error } = await supabase.from('products').insert([productData]);
-
-            if (!error) {
-              setProducts([productData, ...products]);
-            } else {
-              alert('Error al crear el producto');
-              return;
-            }
-          }
-
-          setIsProductFormOpen(false);
-          setEditingProduct(null);
-        };
-
-        const handleSaveCompany = (e) => {
-          e.preventDefault();
-          if (isDemoUser) {
-            showDemoAlert();
-            return;
-          }
-          const updated = {
-            name: compNameInput.trim(),
-            address: compAddrInput.trim(),
-            whatsapp: compWpInput.trim(),
-            rif: compRifInput.trim()
-          };
-          setCompanyInfo(updated);
-          setCompMsg('Datos Guardados.');
-          setTimeout(() => setCompMsg(''), 4000);
-        };
-
-        const handleChangePassword = (e) => {
-          e.preventDefault();
-          if (isDemoUser) {
-            showDemoAlert();
-            return;
-          }
-          const savedPass = localStorage.getItem('katalog_admin_password') || 'admin123';
-          if (currentPass !== savedPass) {
-            setPasswordMsg('Error: La contraseña actual es incorrecta.');
-            return;
-          }
-          if (newPass.length < 4) {
-            setPasswordMsg('Error: La nueva contraseña debe tener al menos 4 caracteres.');
-            return;
-          }
-          if (newPass !== confirmPass) {
-            setPasswordMsg('Error: Las contraseñas no coinciden.');
-            return;
-          }
-          localStorage.setItem('katalog_admin_password', newPass);
-          setPasswordMsg('¡Contraseña actualizada exitosamente!');
-          setCurrentPass('');
-          setNewPass('');
-          setConfirmPass('');
-          setTimeout(() => setPasswordMsg(''), 4000);
-        };
-
-        const handleSendCode = (e) => {
-          e.preventDefault();
-          const code = Math.floor(100000 + Math.random() * 900000).toString();
-          setGeneratedCode(code);
-          setRecoveryStatus(`Código de verificación generado: ${code}`);
-        };
-
-        const handleResetPassWithCode = (e) => {
-          e.preventDefault();
-          if (inputCode.trim() !== generatedCode) {
-            setRecoveryStatus('Error: El código ingresado no coincide.');
-            return;
-          }
-          if (recoveryNewPass.length < 4) {
-            setRecoveryStatus('Error: La nueva clave debe tener al menos 4 caracteres.');
-            return;
-          }
-          localStorage.setItem('katalog_admin_password', recoveryNewPass);
-          setLoginView('login');
-          setRecoveryStatus('¡Contraseña restablecida! Ya puedes ingresar.');
-        };
-
-        const handleLoginSubmit = (e) => {
-          e.preventDefault();
-          const passwordVal = e.target.password.value;
-          const savedPass = localStorage.getItem('katalog_admin_password') || 'admin123';
-
-          if (passwordVal === savedPass || passwordVal === 'admin123') {
-            setIsAdmin(true);
-            setIsDemoUser(false);
-            localStorage.setItem('katalog_admin_logged', 'true');
-            localStorage.setItem('katalog_is_demo', 'false');
-            setIsLoginOpen(false);
-            setIsAdminPanelOpen(true);
-          } else {
-            alert('¡Contraseña incorrecta!');
-          }
-        };
-
-        const handleDemoLogin = () => {
-          setIsAdmin(true);
-          setIsDemoUser(true);
-          localStorage.setItem('katalog_admin_logged', 'true');
-          localStorage.setItem('katalog_is_demo', 'true');
-          setIsLoginOpen(false);
-          setIsAdminPanelOpen(true);
-        };
-
-        const handleLogout = () => {
-          setIsAdmin(false);
-          setIsDemoUser(false);
-          localStorage.removeItem('katalog_admin_logged');
-          localStorage.removeItem('katalog_is_demo');
-          setIsAdminPanelOpen(false);
-        };
-
-        const modalImages = useMemo(() => {
-          if (!selectedProduct) return [];
-          const valid = (selectedProduct.images || []).filter(img => typeof img === 'string' && img.trim() !== '');
-          return valid.length > 0 ? valid.slice(0, 4) : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80'];
-        }, [selectedProduct]);
-
-        return (
-          <div className="min-h-screen flex flex-col bg-stone-50 pb-16">
-            <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-stone-200 shadow-xs">
-              <div className="max-w-7xl mx-auto px-2.5 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-1.5 sm:gap-4">
-                <div className="shrink-0">
-                  <h1 className="font-display font-black text-base sm:text-2xl text-stone-900 tracking-tighter leading-none">
-                    KATALOGO'S VEN<span className="text-stone-400 font-light">.</span>
-                  </h1>
-                  <span className="text-[8px] sm:text-[10px] tracking-widest uppercase font-medium text-stone-500 mt-0.5 block">
-                    Catálogo Emprendedor (Supabase Sync)
-                  </span>
+    <!-- HEADER / NAVEGACIÓN -->
+    <header class="bg-white border-b border-gray-100 sticky top-0 z-30 shadow-xs">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="switchView('catalog')">
+                <div class="bg-emerald-600 text-white p-2 rounded-xl flex items-center justify-center">
+                    <i data-lucide="store" class="w-6 h-6"></i>
                 </div>
+                <span class="font-bold text-lg tracking-tight text-gray-900">Catálogo<span class="text-emerald-600">Express</span></span>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <button onclick="openCartModal()" class="relative bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-xl text-sm font-medium flex items-center space-x-2 transition cursor-pointer">
+                    <i data-lucide="shopping-cart" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">Carrito</span>
+                    <span id="cart-counter" class="bg-emerald-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">0</span>
+                </button>
+                <button onclick="openAdminModal()" class="text-gray-500 hover:text-emerald-600 p-2 rounded-xl transition cursor-pointer" title="Módulo Administrativo">
+                    <i data-lucide="shield-check" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+    </header>
 
-                <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                  <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full bg-stone-100 border border-stone-200 text-xs font-medium">
-                    <span className="relative flex h-2 w-2 shrink-0">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                    <span className="text-stone-500 text-[10px] sm:text-xs whitespace-nowrap font-medium">BCV Oficial:</span>
-                    <span className="font-bold text-stone-900 font-mono-num text-[11px] sm:text-xs whitespace-nowrap">Bs. {bcvRate.toFixed(2)}</span>
-                    <span className="text-[9px] sm:text-[10px] text-stone-500 border-l border-stone-300 pl-1 sm:pl-1.5 whitespace-nowrap">{bcvDate}</span>
-                  </div>
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- VISTA DE CATÁLOGO Y FILTROS -->
+        <div id="view-catalog" class="space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 class="text-2xl font-black text-gray-900">Productos Disponibles</h1>
+                    <p class="text-sm text-gray-500">Haz tus pedidos de forma rápida y segura con entrega inmediata.</p>
                 </div>
-              </div>
-            </header>
-
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full">
-              <div className="mb-6 flex flex-col sm:flex-row gap-3">
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Buscar por nombre, código (SKU) o características..."
-                  className="flex-1 px-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-stone-900"
-                />
-
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="px-4 py-2.5 bg-white border border-stone-200 rounded-xl text-xs font-semibold text-stone-800 shadow-xs focus:outline-none focus:ring-2 focus:ring-stone-900 cursor-pointer min-w-[200px]"
-                >
-                  <option value="">Todas las categorías ({products.length})</option>
-                  {categories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-
-                {isAdmin && !isDemoUser && (
-                  <button
-                    onClick={handleOpenNewProduct}
-                    className="px-4 py-2.5 bg-stone-900 hover:bg-stone-800 text-white font-semibold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
-                  >
-                    + Nuevo Producto
-                  </button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filtered.map(product => {
-                  const calculatedBs = product.price_usd * bcvRate;
-                  const validImgs = (product.images || []).filter(img => img && img.trim() !== '');
-                  const coverImage = validImgs.length > 0 ? validImgs[0] : 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80';
-
-                  return (
-                    <div
-                      key={product.id}
-                      onClick={() => {
-                        setSelectedProduct(product);
-                        setModalPhotoIndex(0);
-                      }}
-                      className="group bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-xs hover:shadow-lg transition-all cursor-pointer flex flex-col justify-between"
-                    >
-                      <div className="relative aspect-square overflow-hidden bg-stone-100">
-                        <img src={coverImage} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                        <div className="absolute top-3 left-3 bg-stone-900/80 backdrop-blur-md text-white text-[11px] font-mono px-2 py-1 rounded-md font-bold">
-                          CÓD: {product.code}
-                        </div>
-                        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md text-stone-800 text-[11px] px-2 py-1 rounded-md font-medium">
-                          {product.category}
-                        </div>
-                        <div className="absolute bottom-3 left-3 bg-stone-900/90 backdrop-blur-md text-white text-[11px] px-2.5 py-1 rounded-md flex items-center gap-1.5 border border-white/10 shadow-xs">
-                          <span className={`w-2 h-2 rounded-full ${product.stock === 0 || product.status === 'Agotado' ? 'bg-red-500 animate-pulse ring-2 ring-red-400/50' : 'bg-emerald-400 ring-2 ring-emerald-400/30'}`}></span>
-                          <span className={product.stock === 0 || product.status === 'Agotado' ? 'text-red-200 font-bold' : ''}>
-                            {product.stock === 0 || product.status === 'Agotado' ? 'Agotado (0 disp.)' : `${product.stock} Disponibles`}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="p-4 flex-1 flex flex-col justify-between">
-                        <div>
-                          <h3 className="font-bold text-stone-900 line-clamp-1">{product.name}</h3>
-                          <p className="text-xs text-stone-500 mt-1 line-clamp-2">{product.description}</p>
-                        </div>
-
-                        <div className="mt-4 pt-3 border-t border-stone-100 flex items-baseline justify-between">
-                          <div>
-                            <span className="text-[10px] text-stone-400 uppercase font-semibold block">USD</span>
-                            <span className="text-lg font-bold text-stone-900 font-mono-num">{formatUsd(product.price_usd)}</span>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-[10px] text-stone-400 font-semibold block">TASA BCV</span>
-                            <span className="text-sm font-bold text-stone-700 font-mono-num">{formatBs(calculatedBs)}</span>
-                          </div>
-                        </div>
-
-                        <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between gap-2">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleCopyProductLink(product); }}
-                            className="flex-1 py-1.5 px-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                          >
-                            <span>🔗</span>
-                            <span>{shareFeedbackId === product.id ? '¡Enlace Copiado!' : 'Compartir'}</span>
-                          </button>
-
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleShareWhatsappDirect(product); }}
-                            className="py-1.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
-                          >
-                            <span>💬</span>
-                            <span>WhatsApp</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </main>
-
-            <div className="fixed bottom-5 right-5 z-40">
-              <button
-                onClick={() => {
-                  if (isAdmin) { setIsAdminPanelOpen(true); } 
-                  else { setLoginView('login'); setIsLoginOpen(true); }
-                }}
-                className="px-4 py-2.5 bg-stone-900 hover:bg-stone-800 text-white rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold border border-white/20 transition-all transform hover:scale-105 cursor-pointer"
-              >
-                <span>{isAdmin ? '⚙️' : '🔒'}</span>
-              </button>
+                <!-- Filtros por categoría -->
+                <div id="category-filters" class="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+                    <button onclick="filterByCategory('all')" class="category-btn bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-medium shrink-0 transition">Todos</button>
+                </div>
             </div>
 
-            {/* Modal de Detalle */}
-            {selectedProduct && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs">
-                <div className="bg-white rounded-3xl max-w-2xl w-full border border-stone-200 shadow-2xl overflow-hidden relative max-h-[90vh] flex flex-col md:flex-row">
-                  <button onClick={() => setSelectedProduct(null)} className="absolute top-4 right-4 z-20 p-2 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 cursor-pointer">✕</button>
+            <!-- Grid de Productos -->
+            <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <div class="col-span-full text-center py-12 text-gray-400">Cargando inventario en tiempo real...</div>
+            </div>
+        </div>
 
-                  <div className="w-full md:w-1/2 bg-stone-100 relative flex flex-col justify-between">
-                    <div className="relative aspect-square w-full overflow-hidden bg-stone-200">
-                      <img src={modalImages[modalPhotoIndex] || modalImages[0]} alt={selectedProduct.name} className="w-full h-full object-cover" />
-                      <div className="absolute top-3 left-3 bg-stone-900/80 backdrop-blur-md text-white text-xs font-mono px-2 py-1 rounded">CÓD: {selectedProduct.code}</div>
-
-                      {modalImages.length > 1 && (
-                        <>
-                          <button onClick={() => setModalPhotoIndex(prev => (prev === 0 ? modalImages.length - 1 : prev - 1))} className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/80 hover:bg-white text-stone-800 flex items-center justify-center font-bold text-sm shadow-md">‹</button>
-                          <button onClick={() => setModalPhotoIndex(prev => (prev === modalImages.length - 1 ? 0 : prev + 1))} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/80 hover:bg-white text-stone-800 flex items-center justify-center font-bold text-sm shadow-md">›</button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="w-full md:w-1/2 p-6 flex flex-col justify-between overflow-y-auto">
-                    <div>
-                      <span className="text-xs font-semibold text-stone-400 uppercase tracking-wider block mb-1">{selectedProduct.category}</span>
-                      <h3 className="text-xl font-bold text-stone-900">{selectedProduct.name}</h3>
-
-                      <div className="mt-3 p-3 bg-stone-50 border border-stone-200 rounded-xl">
-                        <div className="text-2xl font-bold text-stone-900 font-mono-num">{formatUsd(selectedProduct.price_usd)}</div>
-                        <div className="text-sm font-semibold text-stone-700 font-mono-num mt-0.5">{formatBs(selectedProduct.price_usd * bcvRate)}</div>
-                      </div>
-
-                      <div className="mt-3 flex items-center gap-2 p-2.5 rounded-xl bg-stone-50 border border-stone-200">
-                        <span className={`w-2.5 h-2.5 rounded-full ${selectedProduct.stock === 0 || selectedProduct.status === 'agotado' ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`}></span>
-                        <span className={`text-xs font-bold ${selectedProduct.stock === 0 ? 'text-red-600' : 'text-emerald-800'}`}>
-                          {selectedProduct.stock === 0 ? 'Agotado (0 unidades)' : `Disponible (${selectedProduct.stock} unidades)`}
-                        </span>
-                      </div>
-
-                      <p className="text-xs text-stone-600 mt-4 leading-relaxed">{selectedProduct.description}</p>
-                    </div>
-
-                    <div className="mt-6 pt-4 border-t border-stone-100 space-y-2">
-                      <div className="flex gap-2">
-                        <button onClick={() => handleShareWhatsappDirect(selectedProduct)} className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer">
-                          <span>💬</span><span>WhatsApp</span>
-                        </button>
-                        <button onClick={() => handleCopyProductLink(selectedProduct)} className="py-2.5 px-4 bg-stone-100 hover:bg-stone-200 text-stone-800 font-semibold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer">
-                          <span>🔗</span><span>{modalCopied ? '¡Copiado!' : 'Copiar'}</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+        <!-- VISTA DE ADMINISTRACIÓN -->
+        <div id="view-admin" class="hidden space-y-6">
+            <div class="flex items-center justify-between border-b pb-4">
+                <div>
+                    <h1 class="text-2xl font-black text-gray-900">Panel de Administración</h1>
+                    <p class="text-sm text-gray-500">Gestión de inventario y pedidos entrantes en tiempo real.</p>
                 </div>
-              </div>
-            )}
+                <div class="flex items-center gap-2">
+                    <button onclick="switchView('catalog')" class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-xl text-sm font-medium transition cursor-pointer">Salir al Catálogo</button>
+                    <button onclick="logoutAdmin()" class="text-rose-600 hover:bg-rose-50 px-3 py-2 rounded-xl text-sm font-medium transition cursor-pointer">Cerrar Sesión</button>
+                </div>
+            </div>
 
-            {/* Modal de Login */}
-            {isLoginOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs">
-                <div className="bg-white rounded-3xl max-w-sm w-full border border-stone-200 shadow-2xl p-6 relative">
-                  <button onClick={() => setIsLoginOpen(false)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-stone-100 text-stone-400 cursor-pointer">✕</button>
+            <div class="flex space-x-2 border-b border-gray-200">
+                <button onclick="switchAdminTab('orders')" id="tab-orders-btn" class="py-2 px-4 border-b-2 border-emerald-600 font-semibold text-emerald-600 text-sm cursor-pointer">Pedidos Entrantes</button>
+                <button onclick="switchAdminTab('inventory')" id="tab-inventory-btn" class="py-2 px-4 border-b-2 border-transparent text-gray-500 text-sm hover:text-gray-700 cursor-pointer">Gestionar Inventario</button>
+            </div>
 
-                  {loginView === 'login' ? (
+            <div id="admin-orders-section" class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-lg text-gray-800">Monitoreo de Pedidos en Vivo</h3>
+                    <button onclick="triggerAudioNotification()" class="text-xs bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-xl border border-emerald-200 hover:bg-emerald-100 transition flex items-center gap-1 cursor-pointer">
+                        <i data-lucide="volume-2" class="w-3.5 h-3.5"></i> Probar Timbre
+                    </button>
+                </div>
+                <div id="admin-orders-list" class="space-y-3">
+                    <div class="text-gray-400 py-6 text-center">No hay pedidos recientes.</div>
+                </div>
+            </div>
+
+            <div id="admin-inventory-section" class="hidden space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-bold text-lg text-gray-800">Control de Stock y Precios</h3>
+                    <button onclick="openProductModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2 cursor-pointer shadow-xs">
+                        <i data-lucide="plus" class="w-4 h-4"></i> Nuevo Producto
+                    </button>
+                </div>
+                <div class="overflow-x-auto bg-white rounded-2xl shadow-xs border border-gray-100">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 text-xs uppercase">
+                                <th class="p-4 font-semibold">Producto</th>
+                                <th class="p-4 font-semibold">Categoría</th>
+                                <th class="p-4 font-semibold">Precio ($)</th>
+                                <th class="p-4 font-semibold">Stock</th>
+                                <th class="p-4 font-semibold text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-inventory-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL CARRITO -->
+    <div id="cart-modal" class="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="p-5 border-b border-gray-100 flex items-center justify-between">
+                <h3 class="font-bold text-lg text-gray-900">Tu Carrito de Compras</h3>
+                <button onclick="closeCartModal()" class="text-gray-400 hover:text-gray-600 p-1 rounded-full cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div id="cart-items-container" class="p-5 overflow-y-auto flex-grow space-y-3 divide-y divide-gray-100">
+                <p class="text-gray-400 text-center py-6">Tu carrito está vacío</p>
+            </div>
+            <div class="p-5 border-t border-gray-100 bg-gray-50 space-y-4">
+                <div class="flex justify-between items-center font-bold text-lg">
+                    <span>Total:</span>
+                    <span id="cart-total" class="text-emerald-600">$0.00</span>
+                </div>
+                <div class="space-y-3">
+                    <input type="text" id="customer-name" placeholder="Nombre y Apellido *" class="w-full bg-white border border-gray-200 px-4 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+                    <input type="text" id="customer-phone" placeholder="Teléfono / WhatsApp (Ej. +507 6123-4567) *" class="w-full bg-white border border-gray-200 px-4 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+                    <textarea id="customer-address" placeholder="Dirección de entrega exacta (Calle, Edif, Casa) *" rows="2" class="w-full bg-white border border-gray-200 px-4 py-2.5 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"></textarea>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <button onclick="checkoutOrder()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl transition shadow-sm cursor-pointer">Confirmar Pedido</button>
+                    <button onclick="sendOrderWhatsApp()" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-semibold py-3 px-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5" title="Enviar copia por WhatsApp">
+                        <i data-lucide="message-circle" class="w-4 h-4 text-emerald-600"></i> WhatsApp
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL LOGIN ADMIN -->
+    <div id="admin-login-modal" class="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 space-y-5 shadow-2xl">
+            <div class="flex items-center justify-between">
+                <h3 class="font-bold text-lg text-gray-900">Acceso Administrativo</h3>
+                <button onclick="closeAdminModal()" class="text-gray-400 hover:text-gray-600 cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs font-semibold text-gray-500 uppercase">Usuario</label>
+                    <input type="text" id="admin-user" class="w-full mt-1 bg-gray-50 border border-gray-200 px-4 py-2 rounded-xl text-sm" placeholder="Admin3434">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-500 uppercase">Contraseña</label>
+                    <input type="password" id="admin-pass" class="w-full mt-1 bg-gray-50 border border-gray-200 px-4 py-2 rounded-xl text-sm" placeholder="••••••••">
+                </div>
+            </div>
+            <button onclick="handleAdminLogin()" class="w-full bg-gray-900 hover:bg-black text-white font-semibold py-2.5 rounded-xl transition text-sm cursor-pointer">Ingresar al Panel</button>
+        </div>
+    </div>
+
+    <!-- MODAL PRODUCTO (ADMIN) -->
+    <div id="product-modal" class="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between">
+                <h3 id="product-modal-title" class="font-bold text-lg text-gray-900">Crear Producto</h3>
+                <button onclick="closeProductModal()" class="text-gray-400 hover:text-gray-600 cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <input type="hidden" id="prod-id">
+            <div class="space-y-3">
+                <input type="text" id="prod-name" placeholder="Nombre del producto *" class="w-full bg-gray-50 border border-gray-200 px-4 py-2.5 rounded-xl text-sm">
+                <textarea id="prod-desc" placeholder="Descripción corta" rows="2" class="w-full bg-gray-50 border border-gray-200 px-4 py-2.5 rounded-xl text-sm resize-none"></textarea>
+                <div class="grid grid-cols-2 gap-3">
+                    <input type="number" step="0.01" id="prod-price" placeholder="Precio ($) *" class="bg-gray-50 border border-gray-200 px-4 py-2.5 rounded-xl text-sm">
+                    <input type="number" id="prod-stock" placeholder="Stock disponible *" class="bg-gray-50 border border-gray-200 px-4 py-2.5 rounded-xl text-sm">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-500 uppercase mb-1 block">Categoría</label>
+                    <select id="prod-category" class="w-full bg-gray-50 border border-gray-200 px-4 py-2.5 rounded-xl text-sm">
+                        <option value="">Cargando categorías...</option>
+                    </select>
+                </div>
+                <input type="text" id="prod-image" placeholder="URL de la Imagen (https://...)" class="w-full bg-gray-50 border border-gray-200 px-4 py-2.5 rounded-xl text-sm">
+            </div>
+            <button onclick="saveProduct()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl transition text-sm cursor-pointer">Guardar Producto</button>
+        </div>
+    </div>
+
+    <footer class="bg-white border-t border-gray-100 py-6 mt-12 text-center text-xs text-gray-400">
+        &copy; 2026 Catálogo Express · Diseñado para comercio rápido en tiempo real.
+    </footer>
+
+    <!-- SCRIPT DE LÓGICA Y CONEXIÓN SUPABASE -->
+    <script>
+        const SUPABASE_URL = 'https://navjwbdakrfbnsijuyck.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hdmp3YmRha3JmYm5zaWp1eWNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1NTA2MDIsImV4cCI6MjEwODEyNjYwMn0.BmlUvysEUHmvDL7LuWnw9u1HOGaphxL1cGm1uMX0FU4';
+        
+        const ADMIN_CREDENTIALS = {
+            user: "Admin3434",
+            pass: "Panama2006!!"
+        };
+
+        const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+        // Datos iniciales de respaldo en caso de que las tablas aún no estén migradas
+        const FALLBACK_CATEGORIES = [
+            { id: 1, name: 'Bebidas & Cafés' },
+            { id: 2, name: 'Hamburguesas & Combos' },
+            { id: 3, name: 'Snacks & Entradas' },
+            { id: 4, name: 'Postres & Dulces' },
+            { id: 5, name: 'Pizzas & Pastas' }
+        ];
+
+        const FALLBACK_PRODUCTS = [
+            {
+                id: 1,
+                name: 'Hamburguesa Doble Smash Artesanal',
+                description: 'Doble carne angus (200g), queso cheddar fundido, cebolla caramelizada y salsa de la casa.',
+                price: 8.50,
+                stock: 24,
+                category_id: 2,
+                image_url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=800&q=80',
+                categories: { id: 2, name: 'Hamburguesas & Combos' }
+            },
+            {
+                id: 2,
+                name: 'Pizza Pepperoni Supreme',
+                description: 'Masa fermentada 48h, salsa pomodoro San Marzano, mozzarella fresca y pepperoni crocante.',
+                price: 12.00,
+                stock: 15,
+                category_id: 5,
+                image_url: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?auto=format&fit=crop&w=800&q=80',
+                categories: { id: 5, name: 'Pizzas & Pastas' }
+            },
+            {
+                id: 3,
+                name: 'Tequeños Tradicionales (6 und)',
+                description: 'Deditos crujientes rellenos de queso blanco fundente con dip de salsa tártara.',
+                price: 5.50,
+                stock: 40,
+                category_id: 3,
+                image_url: 'https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?auto=format&fit=crop&w=800&q=80',
+                categories: { id: 3, name: 'Snacks & Entradas' }
+            },
+            {
+                id: 4,
+                name: 'Iced Caramel Macchiato',
+                description: 'Espresso doble tostado medio, leche cremosa fría y sirope de caramelo salado.',
+                price: 4.25,
+                stock: 30,
+                category_id: 1,
+                image_url: 'https://images.unsplash.com/photo-1517701550927-30cf4ba1dba5?auto=format&fit=crop&w=800&q=80',
+                categories: { id: 1, name: 'Bebidas & Cafés' }
+            }
+        ];
+
+        let products = JSON.parse(localStorage.getItem('cat_products')) || FALLBACK_PRODUCTS;
+        let categories = JSON.parse(localStorage.getItem('cat_categories')) || FALLBACK_CATEGORIES;
+        let orders = JSON.parse(localStorage.getItem('cat_orders')) || [];
+        let cart = JSON.parse(localStorage.getItem('cat_cart')) || [];
+        let currentFilter = 'all';
+        let isAdminLoggedIn = sessionStorage.getItem('admin_session') === 'true';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.lucide) lucide.createIcons();
+            fetchInitialData();
+            setupRealtimeSubscriptions();
+            updateCartCounter();
+        });
+
+        async function fetchInitialData() {
+            try {
+                if (!supabaseClient) throw new Error("Supabase no inicializado");
+                const [catRes, prodRes, ordRes] = await Promise.all([
+                    supabaseClient.from('categories').select('*').order('id', { ascending: true }),
+                    supabaseClient.from('products').select('*, categories(id, name)').order('id', { ascending: false }),
+                    supabaseClient.from('orders').select('*').order('id', { ascending: false })
+                ]);
+
+                if (!catRes.error && catRes.data && catRes.data.length > 0) {
+                    categories = catRes.data;
+                    localStorage.setItem('cat_categories', JSON.stringify(categories));
+                }
+                if (!prodRes.error && prodRes.data && prodRes.data.length > 0) {
+                    products = prodRes.data;
+                    localStorage.setItem('cat_products', JSON.stringify(products));
+                }
+                if (!ordRes.error && ordRes.data) {
+                    orders = ordRes.data;
+                    localStorage.setItem('cat_orders', JSON.stringify(orders));
+                }
+            } catch (error) {
+                console.warn("Usando datos locales o de respaldo:", error.message);
+            } finally {
+                renderCategories();
+                renderProducts();
+                renderAdminInventory();
+                populateCategoryDropdown();
+                renderAdminOrders();
+            }
+        }
+
+        function setupRealtimeSubscriptions() {
+            if (!supabaseClient) return;
+            try {
+                supabaseClient
+                    .channel('public-db-changes')
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+                        fetchInitialData();
+                    })
+                    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, payload => {
+                        triggerAudioNotification();
+                        showInstantNotification(payload.new);
+                        fetchAdminOrders();
+                    })
+                    .subscribe();
+            } catch (e) {
+                console.warn("Realtime error:", e);
+            }
+        }
+
+        // Síntesis de audio con Web Audio API (timbre de pedido en 2 notas)
+        function triggerAudioNotification() {
+            try {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContextClass) return;
+                const ctx = new AudioContextClass();
+                const now = ctx.currentTime;
+                
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(783.99, now); // Nota Sol (G5)
+                osc.frequency.setValueAtTime(1046.50, now + 0.15); // Nota Do (C6)
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.45);
+            } catch(e) {}
+        }
+
+        function showInstantNotification(order) {
+            const div = document.createElement('div');
+            div.className = "fixed bottom-5 right-5 bg-gray-900 text-white px-5 py-4 rounded-2xl shadow-2xl z-50 flex items-center space-x-3 border border-emerald-500/50 animate-bounce";
+            div.innerHTML = `
+                <div class="bg-emerald-500 text-white p-2 rounded-xl">🛍️</div>
+                <div>
+                    <p class="font-bold text-sm">¡Nuevo Pedido Recibido!</p>
+                    <p class="text-xs text-gray-300">${order.customer_name} - Total: $${Number(order.total_amount).toFixed(2)}</p>
+                </div>
+            `;
+            document.body.appendChild(div);
+            setTimeout(() => div.remove(), 5000);
+        }
+
+        function renderProducts() {
+            const grid = document.getElementById('products-grid');
+            const filtered = currentFilter === 'all' 
+                ? products 
+                : products.filter(p => String(p.category_id) === String(currentFilter));
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center py-12 text-gray-400">No hay productos disponibles en esta categoría.</div>`;
+                return;
+            }
+
+            grid.innerHTML = filtered.map(p => {
+                const inCart = cart.find(item => String(item.id) === String(p.id));
+                const qty = inCart ? inCart.quantity : 0;
+                const isOutOfStock = p.stock <= 0;
+                const isMax = qty >= p.stock;
+
+                return `
+                <div class="bg-white border border-gray-100 rounded-3xl p-4 flex flex-col justify-between shadow-2xs hover:shadow-lg transition">
                     <div>
-                      <div className="text-center mb-6">
-                        <h3 className="text-lg font-bold text-stone-900">Acceso Administrador</h3>
-                        <p className="text-xs text-stone-500 mt-1">Conectado a Base de Datos en la Nube</p>
-                      </div>
-
-                      <form onSubmit={handleLoginSubmit} className="space-y-4">
+                        <div class="aspect-square bg-gray-100 rounded-2xl overflow-hidden mb-3 relative">
+                            <img src="${p.image_url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=500&q=80'}" alt="${p.name}" class="w-full h-full object-cover">
+                            <span class="absolute top-2 left-2 bg-white/90 backdrop-blur-xs text-xs font-semibold px-2.5 py-1 rounded-lg text-gray-700">${p.categories?.name || 'General'}</span>
+                            ${isOutOfStock ? `<span class="absolute top-2 right-2 bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-lg">Agotado</span>` : `<span class="absolute top-2 right-2 bg-black/60 text-white text-[10px] font-medium px-2 py-0.5 rounded-lg">Stock: ${p.stock}</span>`}
+                        </div>
+                        <h3 class="font-bold text-gray-900 text-base mb-1">${p.name}</h3>
+                        <p class="text-gray-500 text-xs line-clamp-2 mb-3">${p.description || 'Sin descripción'}</p>
+                    </div>
+                    <div class="flex items-center justify-between pt-3 border-t border-gray-50">
                         <div>
-                          <input type="password" name="password" defaultValue="admin123" required placeholder="••••••••" className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-stone-900" />
+                            <span class="text-xs text-gray-400 block">Precio</span>
+                            <span class="font-black text-emerald-600 text-lg">$${Number(p.price).toFixed(2)}</span>
                         </div>
-                        <button type="submit" className="w-full py-3 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-bold cursor-pointer">Ingresar</button>
-                      </form>
-
-                      <div className="mt-4 pt-3 border-t border-stone-100">
-                        <button onClick={handleDemoLogin} className="w-full py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-semibold cursor-pointer">👁️ Demo (Solo Lectura)</button>
-                      </div>
+                        <button onclick='addToCartById("${p.id}")' ${isOutOfStock || isMax ? 'disabled' : ''} class="${isOutOfStock || isMax ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'} px-3.5 py-2 rounded-xl transition flex items-center justify-center gap-1.5 text-xs font-bold">
+                            <i data-lucide="${qty > 0 ? 'check' : 'plus'}" class="w-4 h-4"></i>
+                            <span>${qty > 0 ? `${qty} en carrito` : 'Agregar'}</span>
+                        </button>
                     </div>
-                  ) : null}
                 </div>
-              </div>
-            )}
+            `}).join('');
+            if (window.lucide) lucide.createIcons();
+        }
 
-            {/* Panel de Administración */}
-            {isAdminPanelOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-stone-900/70 backdrop-blur-xs overflow-y-auto">
-                <div className="bg-white rounded-3xl max-w-4xl w-full border border-stone-200 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
-                  <div className="px-6 py-4 border-b border-stone-200 flex items-center justify-between bg-stone-50">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-base font-bold text-stone-900">Panel de Administración (Cloud Sync)</h3>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={handleLogout} className="px-3 py-1.5 rounded-lg text-xs text-stone-500 hover:text-stone-900 cursor-pointer">Cerrar Sesión</button>
-                      <button onClick={() => setIsAdminPanelOpen(false)} className="p-2 rounded-full hover:bg-stone-200 text-stone-500 cursor-pointer">✕</button>
-                    </div>
-                  </div>
+        function renderCategories() {
+            const container = document.getElementById('category-filters');
+            let html = `<button onclick="filterByCategory('all')" class="category-btn ${currentFilter === 'all' ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} px-4 py-2 rounded-xl text-sm font-medium shrink-0 transition cursor-pointer">Todos</button>`;
+            
+            categories.forEach(cat => {
+                const active = String(currentFilter) === String(cat.id);
+                html += `<button onclick="filterByCategory('${cat.id}')" class="category-btn ${active ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} px-4 py-2 rounded-xl text-sm font-medium shrink-0 transition cursor-pointer">${cat.name}</button>`;
+            });
+            container.innerHTML = html;
+        }
 
-                  <div className="p-6 overflow-y-auto flex-1">
-                    <div className="flex justify-between items-center mb-4">
-                      <span className="text-xs text-stone-500">Los cambios se guardan directamente en Supabase</span>
-                      <button onClick={handleOpenNewProduct} className="px-4 py-2 bg-stone-900 text-white rounded-xl text-xs font-bold hover:bg-stone-800 cursor-pointer">+ Agregar Producto</button>
-                    </div>
+        function filterByCategory(id) {
+            currentFilter = id;
+            renderCategories();
+            renderProducts();
+        }
 
-                    <div className="divide-y divide-stone-100 border border-stone-200 rounded-2xl overflow-hidden">
-                      {products.map(p => (
-                        <div key={p.id} className="p-3.5 flex items-center justify-between hover:bg-stone-50 gap-3">
-                          <div className="flex items-center gap-3">
-                            <img src={p.images?.[0] || ''} className="w-12 h-12 rounded-xl object-cover" />
-                            <div>
-                              <span className="font-mono text-[10px] bg-stone-100 px-1.5 py-0.5 rounded font-bold text-stone-700">{p.code}</span>
-                              <h4 className="font-semibold text-stone-900 text-sm">{p.name}</h4>
-                              <span className="text-xs text-stone-500 font-mono-num font-bold">{formatUsd(p.price_usd)}</span>
+        function addToCartById(productId) {
+            const product = products.find(p => String(p.id) === String(productId));
+            if (!product) return;
+            addToCart(product);
+        }
+
+        function addToCart(product) {
+            const existing = cart.find(item => String(item.id) === String(product.id));
+            if (existing) {
+                if (existing.quantity < product.stock) {
+                    existing.quantity++;
+                } else {
+                    alert('Has alcanzado el límite del stock disponible.');
+                    return;
+                }
+            } else {
+                if (product.stock > 0) {
+                    cart.push({ ...product, quantity: 1 });
+                } else {
+                    alert('Producto agotado.');
+                    return;
+                }
+            }
+            localStorage.setItem('cat_cart', JSON.stringify(cart));
+            updateCartCounter();
+            renderProducts();
+        }
+
+        // ==========================================
+        // CÓDIGO COMPLETADO Y CORREGIDO
+        // ==========================================
+
+        function updateCartCounter() {
+            const totalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
+            const counterEl = document.getElementById('cart-counter');
+            if (counterEl) {
+                counterEl.textContent = totalItems;
+            }
+        }
+
+        function openCartModal() {
+            renderCartModal();
+            document.getElementById('cart-modal').classList.remove('hidden');
+        }
+
+        function closeCartModal() {
+            document.getElementById('cart-modal').classList.add('hidden');
+        }
+
+        function renderCartModal() {
+            const container = document.getElementById('cart-items-container');
+            const totalEl = document.getElementById('cart-total');
+
+            if (cart.length === 0) {
+                container.innerHTML = `<p class="text-gray-400 text-center py-8">Tu carrito está vacío</p>`;
+                totalEl.textContent = '$0.00';
+                return;
+            }
+
+            let total = 0;
+            container.innerHTML = cart.map(item => {
+                const subtotal = item.price * item.quantity;
+                total += subtotal;
+                return `
+                    <div class="pt-3 pb-3 flex items-center justify-between gap-3">
+                        <div class="flex items-center space-x-3 min-w-0">
+                            <img src="${item.image_url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=100&q=80'}" class="w-12 h-12 rounded-xl object-cover shrink-0">
+                            <div class="min-w-0">
+                                <h4 class="font-bold text-sm text-gray-900 truncate">${item.name}</h4>
+                                <span class="text-xs text-emerald-600 font-bold">$${Number(item.price).toFixed(2)} c/u</span>
                             </div>
-                          </div>
-
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center bg-stone-100 rounded-xl p-1">
-                              <button onClick={() => handleStockChange(p.id, -1)} className="w-7 h-7 flex items-center justify-center font-bold text-stone-600 hover:bg-white rounded-lg cursor-pointer">-</button>
-                              <span className="w-10 text-center font-mono text-xs font-bold">{p.stock}</span>
-                              <button onClick={() => handleStockChange(p.id, 1)} className="w-7 h-7 flex items-center justify-center font-bold text-stone-600 hover:bg-white rounded-lg cursor-pointer">+</button>
-                            </div>
-
-                            <button onClick={() => handleOpenEditProduct(p)} className="p-2 hover:bg-stone-200 rounded-lg text-xs cursor-pointer">✏️</button>
-                            <button onClick={() => handleDeleteProduct(p.id)} className="p-2 hover:bg-rose-100 text-rose-600 rounded-lg text-xs cursor-pointer">🗑️</button>
-                          </div>
                         </div>
-                      ))}
+                        <div class="flex items-center space-x-2 shrink-0">
+                            <div class="flex items-center bg-gray-100 rounded-xl px-1">
+                                <button onclick="changeCartQty('${item.id}', -1)" class="p-1 hover:text-emerald-600 text-gray-500 cursor-pointer"><i data-lucide="minus" class="w-3.5 h-3.5"></i></button>
+                                <span class="w-6 text-center text-xs font-bold">${item.quantity}</span>
+                                <button onclick="changeCartQty('${item.id}', 1)" class="p-1 hover:text-emerald-600 text-gray-500 cursor-pointer"><i data-lucide="plus" class="w-3.5 h-3.5"></i></button>
+                            </div>
+                            <span class="text-xs font-bold text-gray-900 w-14 text-right">$${subtotal.toFixed(2)}</span>
+                            <button onclick="removeCartItem('${item.id}')" class="text-gray-400 hover:text-rose-600 p-1 cursor-pointer"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
                     </div>
-                  </div>
+                `;
+            }).join('');
+
+            totalEl.textContent = `$${total.toFixed(2)}`;
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function changeCartQty(id, delta) {
+            const item = cart.find(i => String(i.id) === String(id));
+            if (!item) return;
+
+            const product = products.find(p => String(p.id) === String(id));
+            const maxStock = product ? product.stock : 999;
+
+            item.quantity += delta;
+            if (item.quantity > maxStock) {
+                item.quantity = maxStock;
+                alert('No hay más unidades en stock.');
+            }
+            if (item.quantity <= 0) {
+                cart = cart.filter(i => String(i.id) !== String(id));
+            }
+
+            localStorage.setItem('cat_cart', JSON.stringify(cart));
+            updateCartCounter();
+            renderCartModal();
+            renderProducts();
+        }
+
+        function removeCartItem(id) {
+            cart = cart.filter(i => String(i.id) !== String(id));
+            localStorage.setItem('cat_cart', JSON.stringify(cart));
+            updateCartCounter();
+            renderCartModal();
+            renderProducts();
+        }
+
+        async function checkoutOrder() {
+            const name = document.getElementById('customer-name').value.trim();
+            const phone = document.getElementById('customer-phone').value.trim();
+            const address = document.getElementById('customer-address').value.trim();
+
+            if (cart.length === 0) {
+                alert('El carrito está vacío.');
+                return;
+            }
+            if (!name || !phone || !address) {
+                alert('Por favor completa todos los campos requeridos (nombre, teléfono y dirección).');
+                return;
+            }
+
+            const totalAmount = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+
+            const orderPayload = {
+                customer_name: name,
+                customer_phone: phone,
+                customer_address: address,
+                total_amount: totalAmount,
+                status: 'Pendiente',
+                items: cart
+            };
+
+            try {
+                if (supabaseClient) {
+                    await supabaseClient.from('orders').insert([orderPayload]);
+                    // Reducir stock en Supabase
+                    for (const item of cart) {
+                        const newStock = Math.max(0, item.stock - item.quantity);
+                        await supabaseClient.from('products').update({ stock: newStock }).eq('id', item.id);
+                    }
+                }
+            } catch (e) {
+                console.warn("Fallback guardando orden localmente:", e);
+            }
+
+            // Guardar local
+            const localOrder = { ...orderPayload, id: Date.now(), created_at: new Date().toISOString() };
+            orders.unshift(localOrder);
+            localStorage.setItem('cat_orders', JSON.stringify(orders));
+
+            // Ajustar stock local
+            products = products.map(p => {
+                const inC = cart.find(c => String(c.id) === String(p.id));
+                return inC ? { ...p, stock: Math.max(0, p.stock - inC.quantity) } : p;
+            });
+            localStorage.setItem('cat_products', JSON.stringify(products));
+
+            // Notificación y Confetti
+            triggerAudioNotification();
+            showInstantNotification(localOrder);
+            if (window.confetti) {
+                confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
+            }
+
+            alert('¡Tu pedido ha sido recibido con éxito! En breve nos pondremos en contacto contigo.');
+
+            // Limpiar formulario y carrito
+            cart = [];
+            localStorage.setItem('cat_cart', JSON.stringify(cart));
+            document.getElementById('customer-name').value = '';
+            document.getElementById('customer-phone').value = '';
+            document.getElementById('customer-address').value = '';
+
+            updateCartCounter();
+            closeCartModal();
+            renderProducts();
+            renderAdminOrders();
+            renderAdminInventory();
+        }
+
+        function sendOrderWhatsApp() {
+            const name = document.getElementById('customer-name').value.trim() || 'Cliente';
+            const phone = document.getElementById('customer-phone').value.trim() || 'No especificado';
+            const address = document.getElementById('customer-address').value.trim() || 'No especificada';
+
+            if (cart.length === 0) {
+                alert('El carrito está vacío.');
+                return;
+            }
+
+            const total = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+            let msg = `*Nuevo Pedido - Catálogo Express*\n`;
+            msg += `*Cliente:* ${name}\n`;
+            msg += `*Teléfono:* ${phone}\n`;
+            msg += `*Dirección:* ${address}\n\n`;
+            msg += `*Productos:*\n`;
+            cart.forEach((i, idx) => {
+                msg += `${idx + 1}. ${i.name} x${i.quantity} ($${(i.price * i.quantity).toFixed(2)})\n`;
+            });
+            msg += `\n*TOTAL:* $${total.toFixed(2)}`;
+
+            window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+        }
+
+        // ==========================================
+        // ADMINISTRACIÓN (LOGIN, PEDIDOS, INVENTARIO)
+        // ==========================================
+
+        function openAdminModal() {
+            if (isAdminLoggedIn) {
+                switchView('admin');
+            } else {
+                document.getElementById('admin-login-modal').classList.remove('hidden');
+            }
+        }
+
+        function closeAdminModal() {
+            document.getElementById('admin-login-modal').classList.add('hidden');
+        }
+
+        function handleAdminLogin() {
+            const user = document.getElementById('admin-user').value.trim();
+            const pass = document.getElementById('admin-pass').value.trim();
+
+            if (user === ADMIN_CREDENTIALS.user && pass === ADMIN_CREDENTIALS.pass) {
+                isAdminLoggedIn = true;
+                sessionStorage.setItem('admin_session', 'true');
+                closeAdminModal();
+                switchView('admin');
+                renderAdminOrders();
+                renderAdminInventory();
+            } else {
+                alert('Credenciales incorrectas. (Usuario: Admin3434 / Clave: Panama2006!!)');
+            }
+        }
+
+        function logoutAdmin() {
+            isAdminLoggedIn = false;
+            sessionStorage.removeItem('admin_session');
+            switchView('catalog');
+        }
+
+        function switchView(view) {
+            const catalogView = document.getElementById('view-catalog');
+            const adminView = document.getElementById('view-admin');
+
+            if (view === 'admin') {
+                catalogView.classList.add('hidden');
+                adminView.classList.remove('hidden');
+                renderAdminOrders();
+                renderAdminInventory();
+            } else {
+                adminView.classList.add('hidden');
+                catalogView.classList.remove('hidden');
+                renderProducts();
+            }
+        }
+
+        function switchAdminTab(tab) {
+            const ordersSec = document.getElementById('admin-orders-section');
+            const invSec = document.getElementById('admin-inventory-section');
+            const tabOrdersBtn = document.getElementById('tab-orders-btn');
+            const tabInvBtn = document.getElementById('tab-inventory-btn');
+
+            if (tab === 'orders') {
+                ordersSec.classList.remove('hidden');
+                invSec.classList.add('hidden');
+                tabOrdersBtn.className = "py-2 px-4 border-b-2 border-emerald-600 font-semibold text-emerald-600 text-sm cursor-pointer";
+                tabInvBtn.className = "py-2 px-4 border-b-2 border-transparent text-gray-500 text-sm hover:text-gray-700 cursor-pointer";
+                renderAdminOrders();
+            } else {
+                ordersSec.classList.add('hidden');
+                invSec.classList.remove('hidden');
+                tabOrdersBtn.className = "py-2 px-4 border-b-2 border-transparent text-gray-500 text-sm hover:text-gray-700 cursor-pointer";
+                tabInvBtn.className = "py-2 px-4 border-b-2 border-emerald-600 font-semibold text-emerald-600 text-sm cursor-pointer";
+                renderAdminInventory();
+            }
+        }
+
+        async function fetchAdminOrders() {
+            try {
+                if (supabaseClient) {
+                    const { data } = await supabaseClient.from('orders').select('*').order('id', { ascending: false });
+                    if (data) orders = data;
+                }
+            } catch (e) {}
+            renderAdminOrders();
+        }
+
+        function renderAdminOrders() {
+            const container = document.getElementById('admin-orders-list');
+            if (!container) return;
+
+            if (orders.length === 0) {
+                container.innerHTML = `<div class="text-gray-400 py-6 text-center">No hay pedidos recientes.</div>`;
+                return;
+            }
+
+            container.innerHTML = orders.map(ord => {
+                let itemsList = [];
+                if (Array.isArray(ord.items)) itemsList = ord.items;
+                else if (typeof ord.items === 'string') {
+                    try { itemsList = JSON.parse(ord.items); } catch(e){}
+                }
+
+                return `
+                <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-xs space-y-2">
+                    <div class="flex items-center justify-between border-b pb-2">
+                        <div>
+                            <span class="font-bold text-gray-900">${ord.customer_name}</span>
+                            <span class="text-xs text-gray-400 ml-2">(${ord.customer_phone})</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-black text-emerald-600 text-base">$${Number(ord.total_amount).toFixed(2)}</span>
+                            <select onchange="updateOrderStatus('${ord.id}', this.value)" class="text-xs border rounded-lg px-2 py-1 bg-gray-50 font-semibold cursor-pointer">
+                                <option value="Pendiente" ${ord.status === 'Pendiente' ? 'selected' : ''}>🟡 Pendiente</option>
+                                <option value="En Preparación" ${ord.status === 'En Preparación' ? 'selected' : ''}>🔵 En Preparación</option>
+                                <option value="Enviado" ${ord.status === 'Enviado' ? 'selected' : ''}>🟣 Enviado</option>
+                                <option value="Entregado" ${ord.status === 'Entregado' ? 'selected' : ''}>🟢 Entregado</option>
+                                <option value="Cancelado" ${ord.status === 'Cancelado' ? 'selected' : ''}>🔴 Cancelado</option>
+                            </select>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500">📍 <strong>Dirección:</strong> ${ord.customer_address}</p>
+                    ${itemsList.length > 0 ? `
+                        <div class="bg-gray-50 p-2 rounded-xl text-xs space-y-1">
+                            <strong class="text-gray-600 block">Artículos:</strong>
+                            <div class="flex flex-wrap gap-1.5">
+                                ${itemsList.map(i => `<span class="bg-white border px-2 py-0.5 rounded text-[11px]">${i.name} x${i.quantity}</span>`).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
                 </div>
-              </div>
-            )}
+            `;
+            }).join('');
+        }
 
-            {/* Formulario Producto */}
-            {isProductFormOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs">
-                <div className="bg-white rounded-3xl max-w-lg w-full border border-stone-200 shadow-2xl p-6 relative max-h-[90vh] overflow-y-auto">
-                  <button onClick={() => setIsProductFormOpen(false)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-stone-100 text-stone-400 cursor-pointer">✕</button>
+        async function updateOrderStatus(orderId, newStatus) {
+            const order = orders.find(o => String(o.id) === String(orderId));
+            if (order) order.status = newStatus;
+            localStorage.setItem('cat_orders', JSON.stringify(orders));
 
-                  <h3 className="text-lg font-bold text-stone-900 mb-4">{editingProduct ? 'Editar Producto' : 'Nuevo Producto'}</h3>
+            if (supabaseClient) {
+                try {
+                    await supabaseClient.from('orders').update({ status: newStatus }).eq('id', orderId);
+                } catch(e) {}
+            }
+            renderAdminOrders();
+        }
 
-                  <form onSubmit={handleSaveProduct} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">Código (SKU)</label>
-                      type="text"
-                          required
-                          value={formCode}
-                          onChange={(e) => setFormCode(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm font-mono font-bold"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">Stock</label>
-                        <input
-                          type="number"
-                          min="0"
-                          required
-                          value={formStock}
-                          onChange={(e) => setFormStock(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm font-mono"
-                        />
-                      </div>
-                    </div>
+        function renderAdminInventory() {
+            const tbody = document.getElementById('admin-inventory-table');
+            if (!tbody) return;
 
-                    <div>
-                      <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">Nombre</label>
-                      <input
-                        type="text"
-                        required
-                        value={formName}
-                        onChange={(e) => setFormName(e.target.value)}
-                        placeholder="Nombre del artículo"
-                        className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm"
-                      />
-                    </div>
+            tbody.innerHTML = products.map(p => `
+                <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+                    <td class="p-4 flex items-center space-x-3">
+                        <img src="${p.image_url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=100&q=80'}" class="w-10 h-10 rounded-xl object-cover">
+                        <div>
+                            <span class="font-bold text-gray-900 block">${p.name}</span>
+                            <span class="text-xs text-gray-400 line-clamp-1">${p.description || ''}</span>
+                        </div>
+                    </td>
+                    <td class="p-4">${p.categories?.name || 'General'}</td>
+                    <td class="p-4 font-black text-emerald-600">$${Number(p.price).toFixed(2)}</td>
+                    <td class="p-4">
+                        <span class="px-2 py-0.5 rounded text-xs font-bold ${p.stock <= 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}">
+                            ${p.stock} unid.
+                        </span>
+                    </td>
+                    <td class="p-4 text-right space-x-2">
+                        <button onclick='editProduct(${JSON.stringify(p)})' class="text-gray-500 hover:text-emerald-600 p-1 cursor-pointer"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
+                        <button onclick='deleteProduct("${p.id}")' class="text-gray-400 hover:text-rose-600 p-1 cursor-pointer"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </td>
+                </tr>
+            `).join('');
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">Categoría</label>
-                        <select
-                          value={formCategory}
-                          onChange={(e) => setFormCategory(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs"
-                        >
-                          {categories.map(c => (
-                            <option key={c} value={c}>{c}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">Precio USD ($)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          required
-                          value={formPriceUsd}
-                          onChange={(e) => setFormPriceUsd(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm font-bold font-mono"
-                        />
-                      </div>
-                    </div>
+            if (window.lucide) lucide.createIcons();
+        }
 
-                    <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 text-xs flex justify-between items-center">
-                      <span className="text-stone-500">Equivalente en Bs (Tasa {bcvRate.toFixed(2)}):</span>
-                      <span className="font-bold text-stone-900 font-mono-num">
-                        {formatBs((parseFloat(formPriceUsd) || 0) * bcvRate)}
-                      </span>
-                    </div>
+        function populateCategoryDropdown() {
+            const select = document.getElementById('prod-category');
+            if (!select) return;
+            select.innerHTML = categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        }
 
-                    <div>
-                      <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">
-                        Fotos en Carrusel (Hasta 4 URLs)
-                      </label>
-                      <div className="space-y-2">
-                        {[0, 1, 2, 3].map((idx) => (
-                          <input
-                            key={idx}
-                            type="url"
-                            value={formImages[idx] || ''}
-                            onChange={(e) => {
-                              const updated = [...formImages];
-                              updated[idx] = e.target.value;
-                              setFormImages(updated);
-                            }}
-                            placeholder={`Foto #${idx + 1} URL (Web o Google Drive)`}
-                            className="w-full px-3 py-1.5 rounded-xl border border-stone-200 text-xs"
-                          />
-                        ))}
-                      </div>
-                      <span className="text-[10px] text-stone-400 mt-1 block">
-                        Se aceptan enlaces directos de imágenes y enlaces compartidos de Google Drive.
-                      </span>
-                    </div>
+        function openProductModal(prod = null) {
+            document.getElementById('product-modal').classList.remove('hidden');
+            populateCategoryDropdown();
 
-                    <div>
-                      <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">Descripción</label>
-                      <textarea
-                        rows="2"
-                        value={formDesc}
-                        onChange={(e) => setFormDesc(e.target.value)}
-                        placeholder="Materiales, dimensiones, detalles..."
-                        className="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs"
-                      />
-                    </div>
+            if (prod) {
+                document.getElementById('product-modal-title').textContent = 'Editar Producto';
+                document.getElementById('prod-id').value = prod.id;
+                document.getElementById('prod-name').value = prod.name;
+                document.getElementById('prod-desc').value = prod.description || '';
+                document.getElementById('prod-price').value = prod.price;
+                document.getElementById('prod-stock').value = prod.stock;
+                document.getElementById('prod-category').value = prod.category_id || '';
+                document.getElementById('prod-image').value = prod.image_url || '';
+            } else {
+                document.getElementById('product-modal-title').textContent = 'Crear Producto';
+                document.getElementById('prod-id').value = '';
+                document.getElementById('prod-name').value = '';
+                document.getElementById('prod-desc').value = '';
+                document.getElementById('prod-price').value = '';
+                document.getElementById('prod-stock').value = '10';
+                document.getElementById('prod-image').value = '';
+            }
+        }
 
-                    <div className="pt-2 flex justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsProductFormOpen(false)}
-                        className="px-4 py-2 bg-stone-100 hover:bg-stone-200 rounded-xl text-xs font-semibold cursor-pointer"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-5 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-bold cursor-pointer"
-                      >
-                        Guardar Producto
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
+        function closeProductModal() {
+            document.getElementById('product-modal').classList.add('hidden');
+        }
 
-            {/* Pie de página con información de la compañía en letra más grande y legible */}
-            <footer className="border-t border-stone-200/90 bg-white py-8 mt-auto">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-4">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-stone-500">
-                  <div className="flex items-center gap-2">
-                    <span className="font-display font-black text-stone-900 tracking-tight text-base">
-                      {companyInfo.name}
-                    </span>
-                    <span>— Catálogo Minimalista</span>
-                  </div>
-                  <div className="text-xs text-stone-500">
-                    Tasa Oficial BCV: <strong className="text-stone-800 font-mono-num">Bs. {bcvRate.toFixed(2)}</strong> ({bcvDate})
-                  </div>
-                </div>
+        function editProduct(product) {
+            openProductModal(product);
+        }
 
-                {/* Información de la Compañía (Letra grande y legible) */}
-                <div className="pt-5 border-t border-stone-200 flex flex-col md:flex-row items-center justify-between gap-4 text-sm sm:text-base text-stone-700 text-center md:text-left">
-                  <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-5 justify-center md:justify-start">
-                    <span className="font-extrabold text-stone-900 text-base sm:text-lg flex items-center justify-center md:justify-start gap-2">
-                      🏢 {companyInfo.name}
-                    </span>
-                    {companyInfo.rif && (
-                      <span className="font-bold text-stone-800 bg-stone-100 px-3 py-1 rounded-lg text-xs sm:text-sm self-center border border-stone-200">
-                        RIF: {companyInfo.rif}
-                      </span>
-                    )}
-                    <span className="text-stone-800 text-sm sm:text-base flex items-center justify-center md:justify-start gap-1.5 font-medium">
-                      📍 {companyInfo.address}
-                    </span>
-                  </div>
+        async function saveProduct() {
+            const id = document.getElementById('prod-id').value;
+            const name = document.getElementById('prod-name').value.trim();
+            const desc = document.getElementById('prod-desc').value.trim();
+            const price = parseFloat(document.getElementById('prod-price').value);
+            const stock = parseInt(document.getElementById('prod-stock').value, 10);
+            const catId = document.getElementById('prod-category').value;
+            const img = document.getElementById('prod-image').value.trim();
 
-                  <div className="shrink-0">
-                    <a
-                      href={`https://wa.me/${(companyInfo.whatsapp || '').replace(/[^0-9]/g, '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm sm:text-base font-bold transition-all shadow-sm cursor-pointer"
-                    >
-                      <span>💬</span>
-                      <span>WhatsApp: {companyInfo.whatsapp}</span>
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </footer>
-          </div>
-        );
-      }
+            if (!name || isNaN(price) || isNaN(stock)) {
+                alert('Por favor completa el nombre, precio y stock correctamente.');
+                return;
+            }
 
-      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+            const catObj = categories.find(c => String(c.id) === String(catId));
+
+            if (id) {
+                // Editar existente
+                const p = products.find(prod => String(prod.id) === String(id));
+                if (p) {
+                    p.name = name;
+                    p.description = desc;
+                    p.price = price;
+                    p.stock = stock;
+                    p.category_id = catId;
+                    p.image_url = img;
+                    p.categories = catObj;
+                }
+                if (supabaseClient) {
+                    try {
+                        await supabaseClient.from('products').update({
+                            name, description: desc, price, stock, category_id: catId, image_url: img
+                        }).eq('id', id);
+                    } catch(e) {}
+                }
+            } else {
+                // Nuevo producto
+                const newP = {
+                    id: Date.now(),
+                    name,
+                    description: desc,
+                    price,
+                    stock,
+                    category_id: catId,
+                    image_url: img,
+                    categories: catObj
+                };
+                if (supabaseClient) {
+                    try {
+                        const { data } = await supabaseClient.from('products').insert([{
+                            name, description: desc, price, stock, category_id: catId, image_url: img
+                        }]).select().single();
+                        if (data) newP.id = data.id;
+                    } catch(e) {}
+                }
+                products.unshift(newP);
+            }
+
+            localStorage.setItem('cat_products', JSON.stringify(products));
+            closeProductModal();
+            renderProducts();
+            renderAdminInventory();
+        }
+
+        async function deleteProduct(id) {
+            if (!confirm('¿Seguro que deseas eliminar este producto?')) return;
+
+            products = products.filter(p => String(p.id) !== String(id));
+            localStorage.setItem('cat_products', JSON.stringify(products));
+
+            if (supabaseClient) {
+                try {
+                    await supabaseClient.from('products').delete().eq('id', id);
+                } catch(e) {}
+            }
+
+            renderProducts();
+            renderAdminInventory();
+        }
     </script>
-  </body>
+</body>
 </html>
