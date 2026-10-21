@@ -377,7 +377,7 @@
                   stock: parseInt(formStock) || 0,
                   description: formDesc,
                   images: cleanImages,
-                  status: (parseInt(formStock) || 0) === 0 ? 'agotado' : (parseInt(formStock) || 0) <= 3 ? 'bajo_stock' : 'disponible'
+                  status: (parseInt(formStock) || 0) === 0 ? 'Agotado' : (parseInt(formStock) || 0) <= 3 ? 'bajo_stock' : 'Disponible'
                 };
               }
               return p;
@@ -392,7 +392,7 @@
               stock: parseInt(formStock) || 0,
               description: formDesc,
               images: cleanImages,
-              status: (parseInt(formStock) || 0) === 0 ? 'agotado' : (parseInt(formStock) || 0) <= 3 ? 'bajo_stock' : 'disponible'
+              status: (parseInt(formStock) || 0) === 0 ? 'Agotado' : (parseInt(formStock) || 0) <= 3 ? 'bajo_stock' : 'Disponible'
             };
             setProducts([newProd, ...products]);
           }
@@ -480,7 +480,7 @@
             setIsLoginOpen(false);
             setIsAdminPanelOpen(true);
           } else {
-            alert('Contraseña incorrecta. Usa "admin123" o recupera tu contraseña.');
+            alert('¡Contraseña incorrecta!');
           }
         };
 
@@ -519,7 +519,7 @@
                     KATALOG<span className="text-stone-400 font-light">.</span>
                   </h1>
                   <span className="text-[8px] sm:text-[10px] tracking-widest uppercase font-medium text-stone-500 mt-0.5 block">
-                    Catálogo Minimalista
+                    Catálogo Emprendedor
                   </span>
                 </div>
 
@@ -541,14 +541,7 @@
                     </span>
                   </div>
 
-                  <button
-                    onClick={fetchBcvRate}
-                    disabled={isLoadingRate}
-                    title="Actualizar tasa BCV"
-                    className="p-1 sm:p-1.5 rounded-full hover:bg-stone-200 text-stone-500 hover:text-stone-900 transition-colors disabled:opacity-50 cursor-pointer shrink-0"
-                  >
-                    <span className={`inline-block ${isLoadingRate ? 'animate-spin' : ''}`}>🔄</span>
-                  </button>
+                 
                 </div>
               </div>
             </header>
