@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Katalog Minimal - Catálogo Minimalista con Tasa BCV & Panel Admin</title>
+    <title>Katalog's VEN </title>
     <!-- Tailwind CSS y Fuentes -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -304,7 +304,7 @@
               return {
                 ...p,
                 stock: newStock,
-                status: newStock === 0 ? 'agotado' : newStock <= 3 ? 'bajo_stock' : 'disponible'
+                status: newStock === 0 ? 'Agotado' : newStock <= 3 ? 'bajo_stock' : 'Disponible'
               };
             }
             return p;
@@ -414,7 +414,7 @@
             rif: compRifInput.trim()
           };
           setCompanyInfo(updated);
-          setCompMsg('Datos de la empresa guardados correctamente.');
+          setCompMsg('Datos Guardados.');
           setTimeout(() => setCompMsg(''), 4000);
         };
 
@@ -610,9 +610,9 @@
 
                         {/* Disponibilidad con punto verde si hay stock o punto ROJO si es 0 */}
                         <div className="absolute bottom-3 left-3 bg-stone-900/90 backdrop-blur-md text-white text-[11px] px-2.5 py-1 rounded-md flex items-center gap-1.5 border border-white/10 shadow-xs">
-                          <span className={`w-2 h-2 rounded-full ${product.stock === 0 || product.status === 'agotado' ? 'bg-red-500 animate-pulse ring-2 ring-red-400/50' : 'bg-emerald-400 ring-2 ring-emerald-400/30'}`}></span>
-                          <span className={product.stock === 0 || product.status === 'agotado' ? 'text-red-200 font-bold' : ''}>
-                            {product.stock === 0 || product.status === 'agotado' ? 'Agotado (0 disp.)' : `${product.stock} disponibles`}
+                          <span className={`w-2 h-2 rounded-full ${product.stock === 0 || product.status === 'Agotado' ? 'bg-red-500 animate-pulse ring-2 ring-red-400/50' : 'bg-emerald-400 ring-2 ring-emerald-400/30'}`}></span>
+                          <span className={product.stock === 0 || product.status === 'Agotado' ? 'text-red-200 font-bold' : ''}>
+                            {product.stock === 0 || product.status === 'Agotado' ? 'Agotado (0 disp.)' : `${product.stock} Disponibles`}
                           </span>
                         </div>
                       </div>
@@ -682,7 +682,7 @@
                 className="px-4 py-2.5 bg-stone-900 hover:bg-stone-800 text-white rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold border border-white/20 transition-all transform hover:scale-105 cursor-pointer"
               >
                 <span>{isAdmin ? '⚙️' : '🔒'}</span>
-                <span>{isAdmin ? 'Panel de Control' : 'Acceso Administrador'}</span>
+                <span>{isAdmin ? 'Panel de Control' : ''}</span>
               </button>
             </div>
 
@@ -765,8 +765,8 @@
                       {/* Estado de Disponibilidad con punto rojo si 0, verde si disponible */}
                       <div className="mt-3 flex items-center gap-2 p-2.5 rounded-xl bg-stone-50 border border-stone-200">
                         <span className={`w-2.5 h-2.5 rounded-full ${selectedProduct.stock === 0 || selectedProduct.status === 'agotado' ? 'bg-red-500 animate-pulse ring-2 ring-red-300' : 'bg-emerald-500 ring-2 ring-emerald-300'}`}></span>
-                        <span className={`text-xs font-bold ${selectedProduct.stock === 0 || selectedProduct.status === 'agotado' ? 'text-red-600' : 'text-emerald-800'}`}>
-                          {selectedProduct.stock === 0 || selectedProduct.status === 'agotado' ? 'Agotado (0 unidades disponibles)' : `Disponible en inventario (${selectedProduct.stock} unidades)`}
+                        <span className={`text-xs font-bold ${selectedProduct.stock === 0 || selectedProduct.status === 'Agotado' ? 'text-red-600' : 'text-emerald-800'}`}>
+                          {selectedProduct.stock === 0 || selectedProduct.status === 'Agotado' ? 'Agotado (0 unidades disponibles)' : `Disponible en inventario (${selectedProduct.stock} unidades)`}
                         </span>
                       </div>
 
@@ -875,7 +875,7 @@
                           onClick={handleDemoLogin}
                           className="w-full py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-semibold cursor-pointer"
                         >
-                          👁️ Explorar Modo Demo (Solo Lectura)
+                          👁️ Demo (Solo Lectura)
                         </button>
                         <p className="text-[10px] text-stone-400 text-center mt-1.5">
                           En modo demo puedes ver las características pero no guardar cambios.
@@ -904,7 +904,7 @@
                               required
                               value={recoveryEmail}
                               onChange={(e) => setRecoveryEmail(e.target.value)}
-                              placeholder="admin@katalog.com"
+                              placeholder="onlineventas3030@gmail.com"
                               className="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs mt-1"
                             />
                           </div>
@@ -1044,7 +1044,7 @@
                     <div className="p-6 overflow-y-auto flex-1">
                       <div className="flex justify-between items-center mb-4">
                         <span className="text-xs text-stone-500">
-                          {isDemoUser ? 'Vista previa en modo demo' : 'Haz clic en los botones para ajustar el stock en tiempo real'}
+                          {isDemoUser ? 'Vista modo demo' : 'Haz clic en los botones para ajustar el stock en tiempo real'}
                         </span>
                         <button
                           onClick={handleOpenNewProduct}
@@ -1361,7 +1361,7 @@
                               updated[idx] = e.target.value;
                               setFormImages(updated);
                             }}
-                            placeholder={`Foto #${idx + 1} URL (https://images.unsplash...)`}
+                            placeholder={`Foto #${idx + 1} URL (https://drive.google.com/file/d/1uSNdpX91CiKAZaywFKzKDuNZDBgk7ceP/view?usp=drive_link)`}
                             className="w-full px-3 py-1.5 rounded-xl border border-stone-200 text-xs"
                           />
                         ))}
